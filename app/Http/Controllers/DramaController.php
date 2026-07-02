@@ -278,7 +278,7 @@ class DramaController extends Controller
                         $hlsParams['source'] = $source;
 
                         // Point to local proxy route (adds API key server-side)
-                        $proxyUrl = route('drama.hls', $hlsParams);
+                        $proxyUrl = route('drama.hls', $hlsParams, false);
 
                         $videoData = [
                             'number' => $matchedEpisode['number'] ?? $ep,
@@ -311,7 +311,7 @@ class DramaController extends Controller
                         $queryString = $parsedUrl['query'] ?? '';
                         parse_str($queryString, $hlsParams);
                         $hlsParams['source'] = $source;
-                        $videoData['videoUrl'] = route('drama.hls', $hlsParams);
+                        $videoData['videoUrl'] = route('drama.hls', $hlsParams, false);
                     }
                 }
             }
