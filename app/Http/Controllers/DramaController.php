@@ -304,9 +304,11 @@ class DramaController extends Controller
                     $videoData = $videoResponse->json();
 
                     // If the API provides an hlsUrl, proxy it through Laravel
-                    // to avoid CORS issues with CDN domains (e.g. DramaWave)
+                    // to avoid CORS issues with CDN domains (e.g. DramaWave).
+                    // We explicitly limit this to dramawave since reelshort's CDN supports CORS natively
+                    // and their upstream API has a bug rejecting ep=0.
                     $rawHlsUrl = $videoData['hlsUrl'] ?? '';
-                    if (!empty($rawHlsUrl)) {
+                    if (!empty($rawHlsUrl) && $source === 'dramawave') {
                         $parsedUrl = parse_url($rawHlsUrl);
                         $queryString = $parsedUrl['query'] ?? '';
                         parse_str($queryString, $hlsParams);
