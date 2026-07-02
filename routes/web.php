@@ -8,3 +8,4 @@ Route::get('/drama/detail', [DramaController::class, 'detail'])->name('drama.det
 Route::get('/drama/suggest', [DramaController::class, 'searchSuggest'])->name('drama.suggest');
 Route::get('/drama/play', [DramaController::class, 'play'])->name('drama.play');
 Route::get('/drama/hls', [DramaController::class, 'proxyHls'])->name('drama.hls');
+Route::get('/drama/segment', [DramaController::class, 'proxySegment'])->name('drama.segment');

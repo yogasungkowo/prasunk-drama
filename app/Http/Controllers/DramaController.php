@@ -302,6 +302,17 @@ class DramaController extends Controller
 
                 if ($videoResponse->successful()) {
                     $videoData = $videoResponse->json();
+
+                    // If the API provides an hlsUrl, proxy it through Laravel
+                    // to avoid CORS issues with CDN domains (e.g. DramaWave)
+                    $rawHlsUrl = $videoData['hlsUrl'] ?? '';
+                    if (!empty($rawHlsUrl)) {
+                        $parsedUrl = parse_url($rawHlsUrl);
+                        $queryString = $parsedUrl['query'] ?? '';
+                        parse_str($queryString, $hlsParams);
+                        $hlsParams['source'] = $source;
+                        $videoData['videoUrl'] = route('drama.hls', $hlsParams);
+                    }
                 }
             }
         } catch (\Exception $e) {
@@ -355,7 +366,8 @@ class DramaController extends Controller
 
     /**
      * Proxy HLS playlist from upstream API.
-     * Browser can't send X-API-Key headers, so we proxy through Laravel.
+     * Handles both direct m3u8 responses (DramaBox) and 302 redirects to CDN (DramaWave).
+     * Rewrites relative segment URLs to absolute CDN URLs so hls.js can fetch them directly.
      */
     public function proxyHls(Request $request)
     {
@@ -372,20 +384,65 @@ class DramaController extends Controller
             $upstreamUrl = "{$this->baseUrl}/{$source}/hls";
             $params = array_filter($request->query(), fn($key) => !in_array($key, ['source']), ARRAY_FILTER_USE_KEY);
 
+            // Use withoutRedirecting() so we can handle 302 manually
             $response = Http::withHeaders([
                 'X-API-Key' => $this->apiKey,
                 'User-Agent' => 'Mozilla/5.0'
-            ])->get($upstreamUrl, $params);
+            ])->withoutRedirecting()->get($upstreamUrl, $params);
 
-            if ($response->successful()) {
-                return response($response->body(), 200, [
-                    'Content-Type' => 'application/vnd.apple.mpegurl',
-                    'Access-Control-Allow-Origin' => '*',
-                    'Cache-Control' => 'public, max-age=3600',
-                ]);
+            $m3u8Body = null;
+            $cdnBaseUrl = null;
+
+            if ($response->status() === 302 || $response->status() === 301) {
+                // Follow redirect manually and fetch m3u8 from CDN server-side
+                $cdnUrl = $response->header('Location');
+                if (!$cdnUrl) {
+                    return response('Redirect location missing', 502);
+                }
+
+                // Extract CDN base URL for rewriting relative segments
+                $cdnBaseUrl = substr($cdnUrl, 0, strrpos($cdnUrl, '/') + 1);
+
+                $cdnResponse = Http::withHeaders([
+                    'User-Agent' => 'Mozilla/5.0'
+                ])->get($cdnUrl);
+
+                if ($cdnResponse->successful()) {
+                    $m3u8Body = $cdnResponse->body();
+                } else {
+                    return response('Failed to fetch HLS from CDN', $cdnResponse->status());
+                }
+            } elseif ($response->successful()) {
+                // Direct m3u8 response (e.g. DramaBox)
+                $m3u8Body = $response->body();
+            } else {
+                return response('Failed to fetch HLS playlist', $response->status());
             }
 
-            return response('Failed to fetch HLS playlist', $response->status());
+            // Rewrite relative segment URLs to absolute CDN URLs
+            if ($m3u8Body && $cdnBaseUrl) {
+                $lines = explode("\n", $m3u8Body);
+                $rewritten = [];
+                foreach ($lines as $line) {
+                    $trimmed = trim($line);
+                    // If line is not a comment/tag and not empty and not already absolute
+                    if ($trimmed !== '' && !str_starts_with($trimmed, '#') && !str_starts_with($trimmed, 'http')) {
+                        $rewritten[] = $cdnBaseUrl . $trimmed;
+                    } elseif (str_contains($trimmed, 'URI="') && !str_contains($trimmed, 'URI="http')) {
+                        // Rewrite URI= references in tags like #EXT-X-MAP:URI="init.mp4"
+                        $rewritten[] = preg_replace('/URI="([^"]+)"/', 'URI="' . $cdnBaseUrl . '$1"', $trimmed);
+                    } else {
+                        $rewritten[] = $trimmed;
+                    }
+                }
+                $m3u8Body = implode("\n", $rewritten);
+            }
+
+            return response($m3u8Body, 200, [
+                'Content-Type' => 'application/vnd.apple.mpegurl',
+                'Access-Control-Allow-Origin' => '*',
+                'Cache-Control' => 'public, max-age=3600',
+            ]);
         } catch (\Exception $e) {
             return response('HLS proxy error: ' . $e->getMessage(), 500);
         }
