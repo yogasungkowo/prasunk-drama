@@ -1,4 +1,4 @@
-<x-layout.app title="Prasunk Drama - Daftar Drama China" :platforms="$platforms" :selectedSource="$selectedSource">
+<x-layout.app title="Prasunk Drama - Daftar Drama" :platforms="$platforms" :selectedSource="$selectedSource">
 
     {{-- Hero Section --}}
     <section class="mx-auto w-full max-w-7xl px-6 pt-12 pb-12 lg:px-8 lg:pt-14">
@@ -7,7 +7,7 @@
                 <p class="font-display text-7xl text-red-400">Streaming Drama Gratis</p>
                 <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">Daftar Drama <span class="text-red-500">Tersedia</span></h1>
                 <p class="mt-4 text-base leading-relaxed text-neutral-400">
-                    Nonton short drama china terpopuler dari platform <span class="text-red-400 font-semibold">{{ $platforms[$selectedSource] ?? $selectedSource }}</span>. Gratis & terupdate.
+                    Nonton short drama terpopuler dari platform <span class="text-red-400 font-semibold">{{ $platforms[$selectedSource] ?? $selectedSource }}</span>. Gratis & terupdate.
                 </p>
             </div>
 
@@ -16,9 +16,7 @@
                 <div class="relative">
                     <input type="text" id="searchInput" autocomplete="off" placeholder="Cari drama di {{ $platforms[$selectedSource] }}..." class="w-full bg-white/[0.02] border border-white/10 rounded-full px-5 py-2.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-red-500/50 transition">
                     <div class="absolute right-4 top-3 text-neutral-400">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m21-21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                        </svg>
+                        <i class="ri-search-line"></i>
                     </div>
                 </div>
 
@@ -29,13 +27,29 @@
             </div>
         </div>
 
-        <div class="mt-8 flex items-center gap-4">
+        <div class="mt-8 flex flex-wrap items-center justify-between gap-4">
             <span class="rounded-full border border-red-500/20 bg-red-500/10 px-4 py-1.5 text-xs font-medium text-red-300">
-                {{ $dramas->total() }} Drama Ditemukan
+                {{ $dramas->total() }} Drama Terbaru Dari {{ $platforms[$selectedSource] ?? $selectedSource }}
             </span>
-            <span class="text-xs text-neutral-500 font-sans">
-                Source: {{ $platforms[$selectedSource] }}
-            </span>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-neutral-500 font-medium mr-1">Bagikan:</span>
+                <!-- WhatsApp -->
+                <a href="https://api.whatsapp.com/send?text={{ rawurlencode('Prasunk Drama - Streaming Short Drama Terpopuler: Nonton short drama terpopuler secara gratis dengan subtitle Indonesia! ' . request()->url()) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/[0.02] hover:bg-green-500/20 hover:border-green-500/30 text-neutral-300 hover:text-green-400 transition" title="Bagikan ke WhatsApp">
+                    <i class="ri-whatsapp-line text-sm"></i>
+                </a>
+                <!-- Facebook -->
+                <a href="https://www.facebook.com/sharer/sharer.php?u={{ rawurlencode(request()->url()) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/[0.02] hover:bg-blue-600/20 hover:border-blue-600/30 text-neutral-300 hover:text-blue-400 transition" title="Bagikan ke Facebook">
+                    <i class="ri-facebook-fill text-sm"></i>
+                </a>
+                <!-- X / Twitter -->
+                <a href="https://twitter.com/intent/tweet?text={{ rawurlencode('Nonton short drama terpopuler secara gratis dengan subtitle Indonesia! @PrasunkDrama') }}&url={{ rawurlencode(request()->url()) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/[0.02] hover:bg-neutral-100/10 hover:border-neutral-100/20 text-neutral-300 hover:text-white transition" title="Bagikan ke X">
+                    <i class="ri-twitter-x-fill text-xs"></i>
+                </a>
+                <!-- Web Share / Copy Link -->
+                <button onclick="sharePage('{{ rawurlencode('Prasunk Drama - Streaming Short Drama Terpopuler') }}', '{{ rawurlencode('Nonton short drama terpopuler secara gratis dengan subtitle Indonesia!') }}', '{{ request()->url() }}')" class="inline-flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-neutral-300 hover:text-white transition cursor-pointer" title="Salin Tautan">
+                    <i class="ri-link text-sm"></i>
+                </button>
+            </div>
         </div>
     </section>
 
@@ -153,7 +167,8 @@
 
                 {{-- Playlist Episode Placeholder --}}
                 <div class="mt-8 border-t border-white/5 pt-6">
-                    <h3 class="text-sm font-semibold text-white mb-3">Daftar Episode</h3>
+                    <h3 class="text-sm font-semibold text-white mb-1">Daftar Episode</h3>
+                    <p class="text-xs text-neutral-400 mb-4">Klik Episode Untuk Mulai Menonton</p>
                     <div id="modalEpisodesList" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                         {{-- Buttons will be injected here --}}
                     </div>

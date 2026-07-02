@@ -9,7 +9,7 @@
             <div class="hidden items-center gap-2 text-sm text-neutral-400 md:flex">
                 <span class="text-xs text-neutral-600 mr-2 uppercase tracking-widest font-semibold">Source:</span>
                 @foreach(array_slice($platforms ?? [], 0, 4) as $key => $name)
-                    <a href="?source={{ $key }}" class="px-3 py-1.5 rounded-full text-xs font-medium transition {{ ($selectedSource ?? '') == $key ? 'bg-red-950/50 text-red-400 border border-red-900/30' : 'text-neutral-400 hover:text-white' }}">
+                    <a href="/?source={{ $key }}" class="px-3 py-1.5 rounded-full text-xs font-medium transition {{ ($selectedSource ?? '') == $key ? 'bg-red-950/50 text-red-400 border border-red-900/30' : 'text-neutral-400 hover:text-white' }}">
                         {{ $name }}
                     </a>
                 @endforeach
@@ -28,7 +28,7 @@
                 </summary>
                 <div class="absolute right-0 mt-2 w-56 max-h-80 overflow-y-auto rounded-2xl border border-white/5 bg-neutral-900/95 p-2 text-sm shadow-xl backdrop-blur-xl">
                     @foreach($platforms ?? [] as $key => $name)
-                        <a href="?source={{ $key }}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-neutral-300 transition hover:bg-white/5 hover:text-red-300 {{ ($selectedSource ?? '') == $key ? 'text-red-400 font-semibold bg-white/[0.02]' : '' }}">
+                        <a href="/?source={{ $key }}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-neutral-300 transition hover:bg-white/5 hover:text-red-300 {{ ($selectedSource ?? '') == $key ? 'text-red-400 font-semibold bg-white/[0.02]' : '' }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />

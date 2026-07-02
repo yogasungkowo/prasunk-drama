@@ -120,3 +120,29 @@ function closeDramaModal() {
         modal.classList.remove('flex');
     }
 }
+
+function sharePage(title, text, url) {
+    title = decodeURIComponent(title);
+    text = decodeURIComponent(text);
+    
+    if (navigator.share) {
+        navigator.share({
+            title: title,
+            text: text,
+            url: url
+        }).catch(err => console.log('Error sharing:', err));
+    } else {
+        navigator.clipboard.writeText(url).then(() => {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-5 right-5 z-50 rounded-xl bg-neutral-900 border border-white/10 px-4 py-3 text-xs text-white shadow-2xl flex items-center gap-2 transition duration-300';
+            toast.innerHTML = `<i class="ri-checkbox-circle-fill text-green-500 text-sm"></i> Link berhasil disalin ke clipboard!`;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+        });
+    }
+}
