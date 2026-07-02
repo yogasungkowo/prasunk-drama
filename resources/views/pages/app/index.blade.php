@@ -64,16 +64,16 @@
                 <p class="text-sm text-neutral-500 mt-2">Coba ganti kata kunci pencarian atau ganti platform source.</p>
             </div>
         @else
-            <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div class="grid grid-cols-2 gap-4 sm:gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 @foreach ($dramas as $drama)
-                    <article onclick="openDramaModal('{{ $drama['id'] }}', '{{ $drama['source'] }}')" class="group cursor-pointer rounded-2xl border border-white/5 bg-white/[0.02] p-4 transition-all duration-300 hover:border-red-500/20 hover:bg-white/[0.04]">
-                        <div class="mb-4 aspect-[3/4] w-full rounded-xl overflow-hidden bg-neutral-900">
+                    <article onclick="openDramaModal('{{ $drama['id'] }}', '{{ $drama['source'] }}')" class="group cursor-pointer rounded-2xl border border-white/5 bg-white/[0.02] p-3 sm:p-4 transition-all duration-300 hover:border-red-500/20 hover:bg-white/[0.04]">
+                        <div class="mb-3 sm:mb-4 aspect-[3/4] w-full rounded-xl overflow-hidden bg-neutral-900">
                             <img src="{{ $drama['cover'] }}" alt="{{ $drama['title'] }}" class="w-full h-full object-cover transition duration-500 group-hover:scale-105" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
                         </div>
-                        <div class="space-y-2">
-                            <h2 class="text-base font-semibold text-white truncate">{{ $drama['title'] }}</h2>
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="rounded-full border border-white/10 px-2.5 py-1 text-neutral-300">{{ $drama['source_name'] }}</span>
+                        <div class="space-y-1.5 sm:space-y-2">
+                            <h2 class="text-sm sm:text-base font-semibold text-white truncate">{{ $drama['title'] }}</h2>
+                            <div class="flex flex-wrap items-center justify-between gap-1 text-[10px] sm:text-xs">
+                                <span class="rounded-full border border-white/10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-neutral-300">{{ $drama['source_name'] }}</span>
                                 <span class="text-red-300">⭐ {{ $drama['rating'] }}</span>
                             </div>
                         </div>
