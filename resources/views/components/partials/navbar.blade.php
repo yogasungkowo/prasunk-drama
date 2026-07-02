@@ -26,7 +26,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                     </svg>
                 </summary>
-                <div class="absolute right-0 mt-2 w-56 max-h-80 overflow-y-auto rounded-2xl border border-white/5 bg-neutral-900/95 p-2 text-sm shadow-xl backdrop-blur-xl">
+                <div class="absolute right-0 mt-2 w-56 max-h-80 overflow-y-auto no-scrollbar rounded-2xl border border-white/5 bg-neutral-900/95 p-2 text-sm shadow-xl backdrop-blur-xl">
                     @foreach($platforms ?? [] as $key => $name)
                         <a href="/?source={{ $key }}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-neutral-300 transition hover:bg-white/5 hover:text-red-300 {{ ($selectedSource ?? '') == $key ? 'text-red-400 font-semibold bg-white/[0.02]' : '' }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
