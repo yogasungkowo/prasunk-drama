@@ -375,7 +375,7 @@ class DramaController extends Controller
         $id = $request->query('id');
         $ep = $request->query('ep');
 
-        if (!$id || !$ep) {
+        if (!$id || $ep === null || $ep === '') {
             return response('Missing id or ep parameter', 400);
         }
 
