@@ -8,8 +8,14 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class DramaController extends Controller
 {
-    private $apiKey = 'ANICHIN-38AC2EEDF66F1F2B74A175811F7ADEDA';
-    private $baseUrl = 'https://api.anichin.bio';
+    private $apiKey;
+    private $baseUrl;
+
+    public function __construct()
+    {
+        $this->apiKey = env('ANICHIN_API_KEY');
+        $this->baseUrl = env('ANICHIN_BASE_URL');
+    }
 
     private $sources = [
         'dramabox' => 'DramaBox',
@@ -124,7 +130,7 @@ class DramaController extends Controller
                     $suggestions[] = [
                         'id' => $item['id'] ?? $item['dramaId'] ?? '',
                         'title' => $item['title'] ?? 'Unknown Title',
-                        'description' => str_limit($item['description'] ?? $item['synopsis'] ?? 'No synopsis.', 90),
+                        'description' => \Illuminate\Support\Str::limit($item['description'] ?? $item['synopsis'] ?? 'No synopsis.', 90),
                         'cover' => $item['cover'] ?? $item['posterImg'] ?? 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop',
                         'rating' => isset($item['rating']) ? number_format($item['rating'], 1) : number_format(8.0 + (hexdec(substr(md5($item['title'] ?? 'rating'), 0, 1)) / 7.5), 1),
                         'source' => $selectedSource
