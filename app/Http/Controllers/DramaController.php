@@ -321,6 +321,14 @@ class DramaController extends Controller
             //
         }
 
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'videoData' => $videoData,
+                'currentEpisode' => $ep,
+                'drama' => $drama
+            ]);
+        }
+
         return view('pages.app.play', [
             'drama' => $drama,
             'source' => $source,

@@ -79,7 +79,7 @@
                                 {{ strtoupper($source) }}
                             </span>
                             <h1 class="text-2xl font-bold text-white leading-tight">
-                                {{ $drama['title'] }} — <span class="text-red-400">Episode {{ $currentEpisode }}</span>
+                                {{ $drama['title'] }} — <span class="text-red-400">Episode <span id="current-episode-display">{{ $currentEpisode }}</span></span>
                             </h1>
                         </div>
                         <div class="flex items-center gap-2 shrink-0 self-start sm:self-center">
@@ -119,7 +119,7 @@
                     <p class="text-xs text-neutral-500 mt-1">Pilih episode untuk langsung memutar video</p>
                 </div>
 
-                <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-4 gap-2 pt-2 border-t border-white/5">
+                <div id="daftar-episode-container" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-4 gap-2 pt-2 border-t border-white/5">
                     @foreach($drama['episodes'] ?? [] as $ep)
                         @php
                             $isCurrent = $ep['number'] == $currentEpisode;
@@ -143,36 +143,96 @@
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            let currentNextUrl = @json($nextEpisodeUrl);
+            let currentHls = null;
+
             const initPlayer = () => {
                 const el = document.getElementById('dramabox-player');
                 if (!el) return;
 
-                const videoUrl = @json($videoData['videoUrl'] ?? '');
-                const nextEpisodeUrl = @json($nextEpisodeUrl);
-                if (!videoUrl) return;
+                const initialVideoUrl = @json($videoData['videoUrl'] ?? '');
+                if (!initialVideoUrl) return;
 
-                const handleVideoEnded = () => {
+                const handleVideoEnded = async () => {
                     const isAutoplay = document.getElementById('autoplay-toggle')?.checked;
-                    if (isAutoplay && nextEpisodeUrl) {
-                        window.location.href = nextEpisodeUrl;
+                    if (isAutoplay && currentNextUrl) {
+                        try {
+                            // Fetch next episode data dynamically
+                            const res = await fetch(currentNextUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                            const data = await res.json();
+                            
+                            if (data.videoData && data.videoData.videoUrl && !data.videoData.locked) {
+                                // Update URL via pushState
+                                window.history.pushState({}, '', currentNextUrl);
+                                
+                                const newUrl = data.videoData.videoUrl;
+                                const isHLS = newUrl.includes('.m3u8') || newUrl.includes('/hls');
+                                const player = window.videojs(el);
+                                
+                                if (isHLS && window.Hls && window.Hls.isSupported()) {
+                                    if (currentHls) currentHls.destroy();
+                                    currentHls = new window.Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+                                    currentHls.loadSource(newUrl);
+                                    currentHls.attachMedia(el);
+                                    currentHls.on(window.Hls.Events.MANIFEST_PARSED, () => player.play().catch(() => {}));
+                                } else if (isHLS && el.canPlayType('application/vnd.apple.mpegurl')) {
+                                    player.src({ src: newUrl, type: 'application/x-mpegURL' });
+                                    player.play().catch(() => {});
+                                } else {
+                                    player.src({ src: newUrl, type: 'video/mp4' });
+                                    player.play().catch(() => {});
+                                }
+                                
+                                // Calculate next URL for the subsequent autoplay
+                                let found = false;
+                                currentNextUrl = null;
+                                for (const ep of data.drama.episodes) {
+                                    if (found && !ep.locked) {
+                                        const searchParams = new URLSearchParams(window.location.search);
+                                        searchParams.set('ep', ep.number);
+                                        currentNextUrl = '?' + searchParams.toString();
+                                        break;
+                                    }
+                                    if (ep.number == data.currentEpisode) found = true;
+                                }
+                                
+                                // Update UI grid
+                                document.querySelectorAll('#daftar-episode-container a').forEach(btn => {
+                                    // btn.textContent may contain '🔒', so we check start logic
+                                    const rawText = btn.textContent.trim();
+                                    const epNum = rawText.split(' ')[0]; // Extract just the number
+                                    if (epNum == data.currentEpisode) {
+                                        btn.className = "py-3 text-xs font-bold rounded-xl text-center transition bg-red-600 text-white shadow-lg shadow-red-600/20";
+                                    } else if (!rawText.includes('🔒')) {
+                                        btn.className = "py-3 text-xs font-bold rounded-xl text-center transition bg-white/[0.02] text-neutral-300 border border-white/5 hover:border-red-500/20 hover:text-red-400";
+                                    }
+                                });
+
+                                // Update episode text in the title
+                                const epDisplay = document.getElementById('current-episode-display');
+                                if (epDisplay) epDisplay.innerText = data.currentEpisode;
+                            } else {
+                                window.location.href = currentNextUrl; // Fallback
+                            }
+                        } catch (err) {
+                            window.location.href = currentNextUrl; // Fallback on error
+                        }
                     }
                 };
 
-                // Detect if this is an HLS stream
-                const isHLS = videoUrl.includes('.m3u8') || videoUrl.includes('/hls');
+                const isHLS = initialVideoUrl.includes('.m3u8') || initialVideoUrl.includes('/hls');
 
                 if (window.videojs) {
                     if (isHLS && window.Hls && window.Hls.isSupported()) {
-                        // === Strategy: hls.js as engine + Video.js as UI ===
-                        const hls = new window.Hls({
+                        currentHls = new window.Hls({
                             maxBufferLength: 30,
                             maxMaxBufferLength: 60,
                         });
                         
-                        hls.loadSource(videoUrl);
-                        hls.attachMedia(el);
+                        currentHls.loadSource(initialVideoUrl);
+                        currentHls.attachMedia(el);
                         
-                        hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+                        currentHls.on(window.Hls.Events.MANIFEST_PARSED, () => {
                             const player = window.videojs(el, {
                                 autoplay: true,
                                 controls: true,
@@ -185,21 +245,20 @@
                             el.play().catch(() => {});
                         });
                         
-                        hls.on(window.Hls.Events.ERROR, (event, data) => {
+                        currentHls.on(window.Hls.Events.ERROR, (event, data) => {
                             if (data.fatal) {
                                 console.error('HLS fatal error:', data.type, data.details);
                                 if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
-                                    hls.startLoad();
+                                    currentHls.startLoad();
                                 } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
-                                    hls.recoverMediaError();
+                                    currentHls.recoverMediaError();
                                 } else {
-                                    hls.destroy();
+                                    currentHls.destroy();
                                 }
                             }
                         });
                     } else if (isHLS && el.canPlayType('application/vnd.apple.mpegurl')) {
-                        // === Safari native HLS support ===
-                        el.src = videoUrl;
+                        el.src = initialVideoUrl;
                         const player = window.videojs(el, {
                             autoplay: true,
                             controls: true,
@@ -210,7 +269,6 @@
                         player.on('ended', handleVideoEnded);
                         el.play().catch(() => {});
                     } else {
-                        // === Non-HLS (direct mp4, etc.) ===
                         const player = window.videojs(el, {
                             autoplay: true,
                             controls: true,
@@ -218,7 +276,7 @@
                             playbackRates: [0.5, 1, 1.25, 1.5, 2],
                         });
                         player.on('ended', handleVideoEnded);
-                        player.src({ src: videoUrl, type: 'video/mp4' });
+                        player.src({ src: initialVideoUrl, type: 'video/mp4' });
                     }
                 } else {
                     setTimeout(initPlayer, 100);
