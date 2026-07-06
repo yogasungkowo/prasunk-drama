@@ -23,14 +23,14 @@
     <meta property="og:url" content="{{ $url ?? request()->url() }}">
     <meta property="og:title" content="{{ $title ?? 'Prasunk Drama - Streaming Short Drama  Terpopuler' }}">
     <meta property="og:description" content="{{ $description ?? 'Nonton short drama  terpopuler secara gratis dengan subtitle Indonesia. Temukan drama trending dari Dramabox, Reelshort, Shortmax, dan lainnya.' }}">
-    <meta property="og:image" content="{{ $image ?? 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=1200&auto=format&fit=crop' }}">
+    <meta property="og:image" content="{{ $image ?? asset('assets/metaassets/ogimage.png') }}">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="{{ $url ?? request()->url() }}">
     <meta property="twitter:title" content="{{ $title ?? 'Prasunk Drama - Streaming Short Drama  Terpopuler' }}">
     <meta property="twitter:description" content="{{ $description ?? 'Nonton short drama  terpopuler secara gratis dengan subtitle Indonesia. Temukan drama trending dari Dramabox, Reelshort, Shortmax, dan lainnya.' }}">
-    <meta property="twitter:image" content="{{ $image ?? 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=1200&auto=format&fit=crop' }}">
+    <meta property="twitter:image" content="{{ $image ?? asset('assets/metaassets/ogimage.png') }}">
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=carattere:400&display=swap" rel="stylesheet" />
