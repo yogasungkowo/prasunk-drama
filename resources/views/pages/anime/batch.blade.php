@@ -39,9 +39,9 @@
 
     <div class="mx-auto w-full max-w-7xl px-6 pt-12 pb-24 lg:px-8">
         <div class="mb-8">
-            <a href="javascript:history.back()" class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 hover:text-red-400 transition-colors group">
+            <a href="{{ route('anime.index') }}" class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 hover:text-red-400 transition-colors group">
                 <i class="ri-arrow-left-line group-hover:-translate-x-1 transition-transform"></i>
-                Kembali
+                Kembali ke Beranda Anime
             </a>
         </div>
 

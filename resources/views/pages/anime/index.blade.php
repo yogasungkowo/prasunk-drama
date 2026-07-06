@@ -50,30 +50,46 @@
 
     @if(!empty($ongoingAnime))
     <section class="mx-auto w-full max-w-7xl px-6 pb-12 lg:px-8">
-        <div id="ongoingGrid" class="grid grid-cols-2 gap-4 sm:gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 relative transition-opacity duration-300">
-            @foreach ($ongoingAnime as $anime)
-            @php $slug = $anime['animeId'] ?? ''; @endphp
-            @continue(empty($slug))
-            <a href="{{ route('anime.detail', $slug) }}" class="group flex flex-col rounded-2xl border border-white/5 bg-white/[0.02] p-3 sm:p-4 transition-all duration-300 hover:border-red-500/20 hover:bg-white/[0.04]">
-                <div class="mb-3 sm:mb-4 aspect-[3/4] w-full relative rounded-xl overflow-hidden bg-neutral-900">
-                    <img src="{{ $anime['poster'] ?? '' }}" alt="{{ $anime['title'] }}" class="w-full h-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
-                    @if(!empty($anime['episodes']))
-                    <div class="absolute top-2 right-2 rounded-full border border-red-500/20 bg-red-600/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-lg shadow-black/20">
-                        Ep {{ $anime['episodes'] }}
-                    </div>
-                    @endif
+        <div class="relative">
+            <div id="ongoingLoading" class="pointer-events-none absolute inset-0 z-20 hidden items-center justify-center rounded-2xl bg-neutral-950/45 backdrop-blur-[2px]">
+                <div class="flex items-center gap-3 rounded-full border border-white/10 bg-neutral-950/90 px-4 py-2 text-sm font-medium text-neutral-200 shadow-2xl">
+                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-red-500/30 border-t-red-500"></span>
+                    Memuat anime...
                 </div>
-                <div class="flex flex-1 flex-col space-y-1.5 sm:space-y-2">
-                    <h3 class="text-sm sm:text-base font-semibold text-white line-clamp-2">{{ $anime['title'] }}</h3>
-                    <div class="mt-auto flex flex-wrap items-center justify-between gap-1 text-[10px] sm:text-xs">
-                        <span class="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-neutral-300">
-                            <i class="ri-calendar-line text-neutral-400"></i> {{ $anime['releaseDay'] ?? 'Ongoing' }}
-                        </span>
-                        <span class="text-neutral-400">{{ $anime['latestReleaseDate'] ?? '' }}</span>
+            </div>
+
+            <div id="ongoingGrid" class="grid grid-cols-2 gap-4 sm:gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 transition-opacity duration-300">
+                @foreach ($ongoingAnime as $anime)
+                @php $slug = $anime['animeId'] ?? ''; @endphp
+                @continue(empty($slug))
+                <a href="{{ route('anime.detail', $slug) }}" class="group flex flex-col rounded-2xl border border-white/5 bg-white/[0.02] p-3 sm:p-4 transition-all duration-300 hover:border-red-500/20 hover:bg-white/[0.04]">
+                    <div class="mb-3 sm:mb-4 aspect-[3/4] w-full relative rounded-xl overflow-hidden bg-neutral-900">
+                        <img src="{{ $anime['poster'] ?? '' }}" alt="{{ $anime['title'] }}" class="w-full h-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
+                        @if(!empty($anime['episodes']))
+                        <div class="absolute top-2 right-2 rounded-full border border-red-500/20 bg-red-600/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-lg shadow-black/20">
+                            Ep {{ $anime['episodes'] }}
+                        </div>
+                        @endif
                     </div>
-                </div>
-            </a>
-            @endforeach
+                    <div class="flex flex-1 flex-col space-y-1.5 sm:space-y-2">
+                        <h3 class="text-sm sm:text-base font-semibold text-white line-clamp-2">{{ $anime['title'] }}</h3>
+                        @php $rating = $anime['score'] ?? $anime['rating'] ?? ''; @endphp
+                        <div class="mt-auto flex flex-wrap items-center justify-between gap-1 text-[10px] sm:text-xs">
+                            <span class="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-neutral-300">
+                                <i class="ri-calendar-line text-neutral-400"></i> {{ $anime['releaseDay'] ?? 'Ongoing' }}
+                            </span>
+                            @if($rating)
+                            <span class="inline-flex items-center gap-1 text-yellow-400 font-medium">
+                                <i class="ri-star-fill text-[10px]"></i> {{ $rating }}
+                            </span>
+                            @elseif(!empty($anime['latestReleaseDate']))
+                            <span class="text-neutral-400">{{ $anime['latestReleaseDate'] }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </a>
+                @endforeach
+            </div>
         </div>
 
         @php
@@ -217,9 +233,18 @@
         function loadOngoingPage(page) {
             const grid = document.getElementById('ongoingGrid');
             const nav = document.getElementById('ongoingPagination');
+            const loading = document.getElementById('ongoingLoading');
             if (!grid || !nav) return;
+            if (nav.dataset.loading === 'true') return;
 
-            grid.classList.add('opacity-50');
+            nav.dataset.loading = 'true';
+            grid.classList.add('opacity-35', 'pointer-events-none');
+            loading?.classList.remove('hidden');
+            loading?.classList.add('flex');
+            nav.querySelectorAll('button').forEach(button => {
+                button.disabled = true;
+                button.classList.add('opacity-50', 'cursor-wait');
+            });
             
             fetch(`/anime/ongoing-ajax?page=${page}`)
                 .then(res => res.json())
@@ -245,7 +270,10 @@
                                             <span class="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-neutral-300">
                                                 <i class="ri-calendar-line text-neutral-400"></i> ${anime.releaseDay || 'Ongoing'}
                                             </span>
-                                            <span class="text-neutral-400">${anime.latestReleaseDate || ''}</span>
+                                            ${(anime.score || anime.rating)
+                                                ? `<span class="inline-flex items-center gap-1 text-yellow-400 font-medium"><i class="ri-star-fill text-[10px]"></i> ${anime.score || anime.rating}</span>`
+                                                : (anime.latestReleaseDate ? `<span class="text-neutral-400">${anime.latestReleaseDate}</span>` : '')
+                                            }
                                         </div>
                                     </div>
                                 </a>
@@ -265,9 +293,20 @@
                         // Scroll back to top of grid
                         grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
-                    grid.classList.remove('opacity-50');
                 })
-                .catch(err => { console.error('Failed to load pagination:', err); grid.classList.remove('opacity-50'); });
+                .catch(err => {
+                    console.error('Failed to load pagination:', err);
+                })
+                .finally(() => {
+                    nav.dataset.loading = 'false';
+                    grid.classList.remove('opacity-35', 'pointer-events-none');
+                    loading?.classList.add('hidden');
+                    loading?.classList.remove('flex');
+                    nav.querySelectorAll('button').forEach(button => {
+                        button.disabled = false;
+                        button.classList.remove('opacity-50', 'cursor-wait');
+                    });
+                });
         }
     </script>
     <style>

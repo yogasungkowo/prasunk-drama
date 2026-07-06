@@ -12,7 +12,7 @@
         <div class="mb-8">
             <a href="{{ route('anime.index') }}" class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 hover:text-red-400 transition-colors group">
                 <i class="ri-arrow-left-line group-hover:-translate-x-1 transition-transform"></i>
-                Kembali ke Daftar Anime
+                Kembali ke Beranda Anime
             </a>
         </div>
 

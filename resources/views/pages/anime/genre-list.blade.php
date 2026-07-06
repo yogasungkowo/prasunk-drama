@@ -2,11 +2,11 @@
 
     <section class="mx-auto w-full max-w-7xl px-6 pt-12 pb-24 lg:px-8">
         <div class="mb-8">
-            <a href="{{ route('anime.genre') }}" class="inline-flex items-center gap-2 text-sm text-neutral-400 hover:text-white transition">
+            <a href="{{ route('anime.index') }}" class="inline-flex items-center gap-2 text-sm text-neutral-400 hover:text-white transition">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12l7.5-7.5M21 12H3" />
                 </svg>
-                Semua Genre
+                Kembali ke Beranda Anime
             </a>
         </div>
 

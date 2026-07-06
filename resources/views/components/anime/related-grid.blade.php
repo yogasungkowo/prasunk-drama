@@ -27,7 +27,8 @@
             $animeSlug = $anime['animeId'] ?? $anime['slug'] ?? $anime['id'] ?? '';
             $poster = $anime['poster'] ?? $anime['cover'] ?? $anime['thumbnail'] ?? '';
             $meta = $anime['releaseDay'] ?? $anime['status'] ?? $anime['type'] ?? 'Anime';
-            $subMeta = $anime['latestReleaseDate'] ?? $anime['score'] ?? $anime['rating'] ?? '';
+            $rating = $anime['score'] ?? $anime['rating'] ?? '';
+            $subMeta = $anime['latestReleaseDate'] ?? '';
         @endphp
         @if($animeSlug)
         <a href="{{ route('anime.detail', $animeSlug) }}" class="group flex flex-col rounded-2xl border border-white/5 bg-white/[0.02] p-3 sm:p-4 transition-all duration-300 hover:border-red-500/20 hover:bg-white/[0.04]">
@@ -45,7 +46,11 @@
                     <span class="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-neutral-300">
                         {{ $meta }}
                     </span>
-                    @if($subMeta)
+                    @if($rating)
+                    <span class="inline-flex items-center gap-1 text-yellow-400 font-medium">
+                        <i class="ri-star-fill text-[10px]"></i> {{ $rating }}
+                    </span>
+                    @elseif($subMeta)
                     <span class="text-neutral-400">{{ $subMeta }}</span>
                     @endif
                 </div>

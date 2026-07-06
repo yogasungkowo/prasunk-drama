@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -36,6 +37,7 @@ class AnimeController extends Controller
 
             if ($ongoingResponse->successful()) {
                 $ongoingAnime = $ongoingResponse->json()['data']['animeList'] ?? [];
+                $ongoingAnime = $this->enrichAnimeScores($ongoingAnime);
             }
         } catch (\Exception $e) {
             // Silence
@@ -192,6 +194,7 @@ class AnimeController extends Controller
 
             if ($response->successful()) {
                 $animeList = $response->json()['data']['animeList'] ?? [];
+                $animeList = $this->enrichAnimeScores($animeList);
             }
         } catch (\Exception $e) {
             // Silence
@@ -215,6 +218,7 @@ class AnimeController extends Controller
 
             if ($response->successful()) {
                 $animeList = $response->json()['data']['animeList'] ?? [];
+                $animeList = $this->enrichAnimeScores($animeList);
             }
         } catch (\Exception $e) {
             // Silence
@@ -466,6 +470,44 @@ class AnimeController extends Controller
             'genreSlug' => $genre['slug'],
             'animeList' => array_slice($animeList, 0, $limit),
         ];
+    }
+
+    private function enrichAnimeScores(array $animeList): array
+    {
+        return array_map(function ($anime) {
+            if (!empty($anime['score']) || !empty($anime['rating'])) {
+                return $anime;
+            }
+
+            $animeId = $anime['animeId'] ?? $anime['slug'] ?? $anime['id'] ?? '';
+
+            if (!$animeId) {
+                return $anime;
+            }
+
+            $score = Cache::remember("anime-score:{$animeId}", now()->addHours(6), function () use ($animeId) {
+                try {
+                    $response = Http::withHeaders([
+                        'User-Agent' => 'Mozilla/5.0'
+                    ])->get("{$this->baseUrl}/anime/anime/{$animeId}");
+
+                    if ($response->successful()) {
+                        $detail = $response->json()['data'] ?? $response->json();
+                        return $detail['score'] ?? $detail['rating'] ?? null;
+                    }
+                } catch (\Exception $e) {
+                    return null;
+                }
+
+                return null;
+            });
+
+            if ($score) {
+                $anime['score'] = $score;
+            }
+
+            return $anime;
+        }, $animeList);
     }
 
     private function firstGenre($genres): ?array
