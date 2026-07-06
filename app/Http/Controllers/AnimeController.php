@@ -72,6 +72,7 @@ class AnimeController extends Controller
     public function detail($slug)
     {
         $anime = null;
+        $relatedAnime = null;
 
         try {
             $response = Http::withHeaders([
@@ -80,6 +81,14 @@ class AnimeController extends Controller
 
             if ($response->successful()) {
                 $anime = $response->json()['data'] ?? $response->json();
+            }
+
+            if ($anime) {
+                $relatedAnime = $this->getRelatedAnimeByGenre($anime['genreList'] ?? $anime['genre'] ?? [], [
+                    $slug,
+                    $anime['animeId'] ?? '',
+                    $anime['title'] ?? '',
+                ]);
             }
         } catch (\Exception $e) {
             // Silence
@@ -91,6 +100,7 @@ class AnimeController extends Controller
 
         return view('pages.anime.detail', [
             'anime' => $anime,
+            'relatedAnime' => $relatedAnime,
             'slug' => $slug,
         ]);
     }
@@ -98,6 +108,9 @@ class AnimeController extends Controller
     public function episode($slug)
     {
         $episode = null;
+        $batchDownload = null;
+        $animeDetail = null;
+        $relatedAnime = null;
 
         try {
             $response = Http::withHeaders([
@@ -106,6 +119,50 @@ class AnimeController extends Controller
 
             if ($response->successful()) {
                 $episode = $response->json()['data'] ?? $response->json();
+            }
+
+            if ($episode) {
+                $batchInfo = $episode['batch'] ?? $episode['info']['batch'] ?? null;
+                $batchSlug = is_array($batchInfo)
+                    ? ($batchInfo['batchId'] ?? $batchInfo['slug'] ?? '')
+                    : (is_string($batchInfo) ? $batchInfo : '');
+
+                if ((!$batchSlug || empty($episode['info']['genreList'])) && !empty($episode['animeId'])) {
+                    $detailResponse = Http::withHeaders([
+                        'User-Agent' => 'Mozilla/5.0'
+                    ])->get("{$this->baseUrl}/anime/anime/{$episode['animeId']}");
+
+                    if ($detailResponse->successful()) {
+                        $animeDetail = $detailResponse->json()['data'] ?? $detailResponse->json();
+                        $batchInfo = $animeDetail['batch'] ?? null;
+                        $detailBatchSlug = is_array($batchInfo)
+                            ? ($batchInfo['batchId'] ?? $batchInfo['slug'] ?? '')
+                            : (is_string($batchInfo) ? $batchInfo : '');
+
+                        if ($detailBatchSlug) {
+                            $batchSlug = $detailBatchSlug;
+                        }
+                    }
+                }
+
+                if ($batchSlug) {
+                    $batchResponse = Http::withHeaders([
+                        'User-Agent' => 'Mozilla/5.0'
+                    ])->get("{$this->baseUrl}/anime/batch/{$batchSlug}");
+
+                    if ($batchResponse->successful()) {
+                        $batchDownload = $batchResponse->json()['data'] ?? $batchResponse->json();
+                    }
+                }
+
+                $relatedGenres = $episode['info']['genreList']
+                    ?? $episode['genreList']
+                    ?? $animeDetail['genreList']
+                    ?? [];
+                $relatedAnime = $this->getRelatedAnimeByGenre($relatedGenres, [
+                    $episode['animeId'] ?? '',
+                    $animeDetail['title'] ?? '',
+                ]);
             }
         } catch (\Exception $e) {
             // Silence
@@ -117,6 +174,8 @@ class AnimeController extends Controller
 
         return view('pages.anime.play', [
             'episode' => $episode,
+            'batchDownload' => $batchDownload,
+            'relatedAnime' => $relatedAnime,
             'slug' => $slug,
         ]);
     }
@@ -286,6 +345,7 @@ class AnimeController extends Controller
     public function batch($slug)
     {
         $batch = null;
+        $relatedAnime = null;
 
         try {
             $response = Http::withHeaders([
@@ -294,6 +354,14 @@ class AnimeController extends Controller
 
             if ($response->successful()) {
                 $batch = $response->json()['data'] ?? $response->json();
+            }
+
+            if ($batch) {
+                $relatedAnime = $this->getRelatedAnimeByGenre($batch['genreList'] ?? $batch['genres'] ?? $batch['genre'] ?? [], [
+                    $slug,
+                    $batch['animeId'] ?? '',
+                    $batch['title'] ?? '',
+                ]);
             }
         } catch (\Exception $e) {
             // Silence
@@ -305,6 +373,7 @@ class AnimeController extends Controller
 
         return view('pages.anime.batch', [
             'batch' => $batch,
+            'relatedAnime' => $relatedAnime,
             'slug' => $slug,
         ]);
     }
@@ -346,5 +415,84 @@ class AnimeController extends Controller
         return view('pages.anime.unlimited', [
             'animeList' => $animeList,
         ]);
+    }
+
+    private function getRelatedAnimeByGenre($genres, array $exclude = [], int $limit = 10): ?array
+    {
+        $genre = $this->firstGenre($genres);
+
+        if (!$genre || empty($genre['slug'])) {
+            return null;
+        }
+
+        $animeList = [];
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0'
+            ])->get("{$this->baseUrl}/anime/genre/{$genre['slug']}", ['page' => 1]);
+
+            if ($response->successful()) {
+                $animeList = $response->json()['data']['animeList'] ?? [];
+            }
+        } catch (\Exception $e) {
+            return null;
+        }
+
+        $exclude = array_filter(array_map(fn ($value) => strtolower((string) $value), $exclude));
+        $animeList = array_values(array_filter($animeList, function ($anime) use ($exclude) {
+            $keys = [
+                $anime['animeId'] ?? '',
+                $anime['slug'] ?? '',
+                $anime['id'] ?? '',
+                $anime['title'] ?? '',
+            ];
+
+            foreach ($keys as $key) {
+                if ($key !== '' && in_array(strtolower((string) $key), $exclude, true)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+
+        if (empty($animeList)) {
+            return null;
+        }
+
+        return [
+            'genreTitle' => $genre['title'],
+            'genreSlug' => $genre['slug'],
+            'animeList' => array_slice($animeList, 0, $limit),
+        ];
+    }
+
+    private function firstGenre($genres): ?array
+    {
+        if (!is_array($genres) || empty($genres)) {
+            return null;
+        }
+
+        $genre = reset($genres);
+        $title = is_string($genre)
+            ? $genre
+            : ($genre['title'] ?? $genre['name'] ?? $genre['genreName'] ?? '');
+        $slug = is_string($genre)
+            ? \Illuminate\Support\Str::slug($genre)
+            : ($genre['genreId'] ?? $genre['slug'] ?? \Illuminate\Support\Str::slug($title));
+
+        if (!$title && $slug) {
+            $title = str($slug)->replace('-', ' ')->title()->toString();
+        }
+
+        if (!$title || !$slug) {
+            return null;
+        }
+
+        return [
+            'title' => $title,
+            'slug' => $slug,
+        ];
     }
 }

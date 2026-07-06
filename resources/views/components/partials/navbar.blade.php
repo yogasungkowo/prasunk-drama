@@ -1,7 +1,11 @@
+@php
+    $isAnimePage = request()->routeIs('anime.*') || request()->is('anime*');
+@endphp
+
 <header class="sticky top-0 z-50 border-b border-white/5 bg-neutral-950/80 backdrop-blur-xl">
     <nav class="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 lg:px-8">
-        <a href="/" class="font-display text-2xl sm:text-3xl text-white tracking-tight transition hover:text-red-300 shrink-0">
-            Prasunk <span class="text-red-400">Drama</span>
+        <a href="/" class="text-2xl sm:text-3xl font-bold text-white tracking-tight transition hover:text-red-300 shrink-0">
+            Prasunk<span class="font-display font-normal text-3xl sm:text-4xl text-red-400">{{ $isAnimePage ? 'Anime' : 'Drama' }}</span>
         </a>
 
         <div class="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4">

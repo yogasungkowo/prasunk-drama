@@ -92,13 +92,17 @@
                 <div class="flex flex-wrap gap-2 mb-8">
                     @foreach ($genres as $genre)
                     @php 
-                        $genreId = is_string($genre) ? \Illuminate\Support\Str::slug($genre) : ($genre['genreId'] ?? $genre['slug'] ?? \Illuminate\Support\Str::slug($genre['title'] ?? '')); 
-                        $genreTitle = is_string($genre) ? $genre : ($genre['title'] ?? $genre['name'] ?? '');
+                        $genreTitle = is_string($genre) ? $genre : ($genre['title'] ?? $genre['name'] ?? $genre['genreName'] ?? '');
+                        $genreId = is_string($genre) ? \Illuminate\Support\Str::slug($genre) : ($genre['genreId'] ?? $genre['slug'] ?? \Illuminate\Support\Str::slug($genreTitle));
                     @endphp
-                    @if($genreId)
+                    @if($genreTitle && $genreId)
                     <a href="{{ route('anime.genre.list', $genreId) }}" class="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all">
                         {{ $genreTitle }}
                     </a>
+                    @elseif($genreTitle)
+                    <span class="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400">
+                        {{ $genreTitle }}
+                    </span>
                     @endif
                     @endforeach
                 </div>
@@ -171,6 +175,11 @@
 
             </div>
         </div>
+
+        @include('components.anime.related-grid', [
+            'relatedAnime' => $relatedAnime ?? null,
+            'sectionClass' => 'mt-12',
+        ])
     </div>
 
 </x-layout.app>

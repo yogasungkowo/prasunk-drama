@@ -1,3 +1,44 @@
+@php
+    $downloadQualities = $episode['downloadUrl']['qualities'] ?? [];
+    $batchTitle = $batchDownload['title'] ?? 'Batch Download';
+    $batchFormats = $batchDownload['downloadUrl']['formats']
+        ?? $batchDownload['download_url']['formats']
+        ?? $batchDownload['downloads']['formats']
+        ?? [];
+    $batchQualities = $batchDownload['downloadUrl']['qualities']
+        ?? $batchDownload['download_url']['qualities']
+        ?? $batchDownload['download_links']
+        ?? $batchDownload['links']
+        ?? [];
+
+    if (empty($batchFormats) && !empty($batchQualities)) {
+        $batchFormats = [[
+            'title' => $batchTitle . ' Batch Subtitle Indonesia',
+            'qualities' => $batchQualities,
+        ]];
+    }
+
+    $downloadSectionId = !empty($downloadQualities) ? 'download-section' : 'batch-download-section';
+    $formatQualityLabel = function ($label) {
+        $label = trim((string) $label);
+
+        if ($label === '') {
+            return 'Download';
+        }
+
+        $label = str_replace(['_', '-'], ' ', $label);
+        $label = preg_replace('/\s+/', ' ', $label);
+        $label = preg_replace_callback('/\b(mp4|mkv|x265|x264|hevc)\b/i', function ($matches) {
+            return strtoupper($matches[1]);
+        }, $label);
+        $label = preg_replace_callback('/\b(\d{3,4})\s*p\b/i', function ($matches) {
+            return $matches[1] . 'p';
+        }, $label);
+
+        return trim($label);
+    };
+@endphp
+
 <x-layout.app :title="($episode['title'] ?? 'Nonton Anime') . ' - Prasunk Anime'" :description="'Nonton streaming anime subtitle Indonesia.'" :image="$episode['info']['poster'] ?? null">
 
     <div class="mx-auto w-full max-w-7xl px-6 pt-12 pb-24 lg:px-8">
@@ -64,8 +105,8 @@
                         </a>
                         @endif
                         
-                        @if(!empty($episode['downloadUrl']) && isset($episode['downloadUrl']['qualities']))
-                        <a href="#download-section" class="inline-flex items-center gap-1.5 rounded-full bg-red-600/20 border border-red-500/30 px-4 py-2 text-xs font-semibold text-red-300 hover:bg-red-600/30 transition shadow-lg shadow-red-900/20">
+                        @if(!empty($downloadQualities) || !empty($batchFormats))
+                        <a href="#{{ $downloadSectionId }}" class="inline-flex items-center gap-1.5 rounded-full bg-red-600/20 border border-red-500/30 px-4 py-2 text-xs font-semibold text-red-300 hover:bg-red-600/30 transition shadow-lg shadow-red-900/20">
                             <i class="ri-download-2-line"></i>
                             Download
                         </a>
@@ -74,7 +115,7 @@
                 </div>
             </div>
 
-            <div class="space-y-6 max-h-[80vh] overflow-y-auto no-scrollbar lg:col-span-1">
+            <div class="space-y-6 self-start lg:col-span-1">
                 {{-- Server Selection --}}
                 @php $serverQualities = $episode['server']['qualities'] ?? []; @endphp
                 @if(!empty($serverQualities))
@@ -140,38 +181,127 @@
                 @endif
             </div>
             
-            @php $downloadQualities = $episode['downloadUrl']['qualities'] ?? []; @endphp
             @if(!empty($downloadQualities))
             {{-- Download Section --}}
-            <div id="download-section" class="col-span-1 lg:col-span-3 border border-white/5 bg-white/[0.02] rounded-3xl p-6 md:p-8 backdrop-blur-sm mb-8 mt-4">
-                <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                    <i class="ri-download-cloud-2-line text-red-500"></i> Link Download
-                </h3>
+            <section id="download-section" class="col-span-1 lg:col-span-3 mb-2 mt-4">
+                <div class="mb-6">
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="ri-download-cloud-2-line text-red-500"></i>
+                        Link Download Episode
+                    </h2>
+                    <p class="text-sm text-neutral-400 mt-1">Pilih kualitas episode dan server download yang tersedia.</p>
+                </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    @foreach($downloadQualities as $format)
-                    <div class="bg-neutral-900/50 rounded-2xl p-4 border border-white/5 hover:border-white/10 transition-colors">
-                        <div class="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
-                            <h4 class="font-bold text-white">{{ $format['title'] ?? '' }}</h4>
-                            @if(!empty($format['size']))
-                            <span class="text-xs font-medium text-red-400 bg-red-400/10 px-2 py-1 rounded-md">{{ $format['size'] }}</span>
-                            @endif
-                        </div>
-                        
-                        <div class="flex flex-wrap gap-2">
-                            @if(!empty($format['urls']))
-                                @foreach($format['urls'] as $dl)
-                                <a href="{{ $dl['url'] ?? '#' }}" target="_blank" class="rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/20 transition-all shadow-sm">
-                                    {{ $dl['title'] ?? 'Link' }}
+                <div class="rounded-3xl border border-white/5 bg-white/[0.02] p-5 md:p-6 backdrop-blur-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        @foreach($downloadQualities as $quality)
+                        @php $urls = $quality['urls'] ?? []; @endphp
+                        <div class="rounded-2xl border border-white/5 bg-neutral-900/60 p-4 hover:border-white/10 transition-colors">
+                            <div class="flex items-center justify-between gap-4 border-b border-white/10 pb-3 mb-4">
+                                <h3 class="font-bold text-white">{{ $formatQualityLabel($quality['title'] ?? $quality['quality'] ?? 'Download') }}</h3>
+                                @if(!empty($quality['size']))
+                                <span class="shrink-0 rounded-md bg-red-400/10 px-2 py-1 text-xs font-medium text-red-400">{{ $quality['size'] }}</span>
+                                @endif
+                            </div>
+                            
+                            @if(!empty($urls))
+                            <div class="flex flex-wrap gap-2">
+                                @foreach($urls as $dl)
+                                @php $url = $dl['url'] ?? $dl['link'] ?? ''; @endphp
+                                @if($url)
+                                <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/20 transition-all">
+                                    <i class="ri-external-link-line text-red-400"></i>
+                                    {{ $dl['title'] ?? $dl['server'] ?? $dl['label'] ?? 'Link' }}
                                 </a>
+                                @endif
                                 @endforeach
+                            </div>
+                            @else
+                            <p class="text-sm text-neutral-500">Link untuk kualitas ini belum tersedia.</p>
                             @endif
                         </div>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+            @endif
+
+            @if(!empty($batchFormats))
+            <section id="batch-download-section" class="col-span-1 lg:col-span-3 mb-8 mt-4">
+                <div class="mb-6">
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="ri-archive-line text-red-500"></i>
+                        Link Download Batch
+                    </h2>
+                    <p class="text-sm text-neutral-400 mt-1">Download semua episode sekaligus berdasarkan format dan resolusi.</p>
+                </div>
+
+                <div class="space-y-6">
+                    @foreach($batchFormats as $format)
+                    @php
+                        $qualities = $format['qualities'] ?? [];
+                        if (empty($qualities) && !empty($format['urls'])) {
+                            $qualities = [$format];
+                        }
+                    @endphp
+
+                    <div class="rounded-3xl border border-white/5 bg-white/[0.02] p-5 md:p-6 backdrop-blur-sm">
+                        @if(!empty($format['title']))
+                        <h3 class="text-base font-bold text-white mb-5">{{ $format['title'] }}</h3>
+                        @endif
+
+                        @if(!empty($qualities))
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            @foreach($qualities as $quality)
+                            @php
+                                $urls = $quality['urls'] ?? [];
+                                if (empty($urls) && (!empty($quality['url']) || !empty($quality['link']))) {
+                                    $urls = [[
+                                        'title' => $quality['server'] ?? $quality['label'] ?? $quality['title'] ?? 'Download',
+                                        'url' => $quality['url'] ?? $quality['link'],
+                                    ]];
+                                }
+                            @endphp
+
+                            <div class="rounded-2xl border border-white/5 bg-neutral-900/60 p-4 hover:border-white/10 transition-colors">
+                                <div class="flex items-center justify-between gap-4 border-b border-white/10 pb-3 mb-4">
+                                    <h4 class="font-bold text-white">{{ $formatQualityLabel($quality['title'] ?? $quality['quality'] ?? 'Download') }}</h4>
+                                    @if(!empty($quality['size']))
+                                    <span class="shrink-0 rounded-md bg-red-400/10 px-2 py-1 text-xs font-medium text-red-400">{{ $quality['size'] }}</span>
+                                    @endif
+                                </div>
+
+                                @if(!empty($urls))
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach($urls as $link)
+                                    @php $url = $link['url'] ?? $link['link'] ?? ''; @endphp
+                                    @if($url)
+                                    <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/20 transition-all">
+                                        <i class="ri-external-link-line text-red-400"></i>
+                                        {{ $link['title'] ?? $link['server'] ?? $link['label'] ?? 'Link' }}
+                                    </a>
+                                    @endif
+                                    @endforeach
+                                </div>
+                                @else
+                                <p class="text-sm text-neutral-500">Link untuk kualitas ini belum tersedia.</p>
+                                @endif
+                            </div>
+                            @endforeach
+                        </div>
+                        @else
+                        <p class="text-sm text-neutral-500">Belum ada kualitas download untuk format ini.</p>
+                        @endif
                     </div>
                     @endforeach
                 </div>
-            </div>
+            </section>
             @endif
+
+            @include('components.anime.related-grid', [
+                'relatedAnime' => $relatedAnime ?? null,
+                'sectionClass' => 'col-span-1 lg:col-span-3 mb-8 mt-4',
+            ])
 
         </div>
     </div>
@@ -227,14 +357,5 @@
             }
         }
     </script>
-    <style>
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-    </style>
     @endpush
 </x-layout.app>

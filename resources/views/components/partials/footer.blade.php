@@ -1,7 +1,12 @@
+@php
+    $isAnimePage = request()->routeIs('anime.*') || request()->is('anime*');
+    $brandSuffix = $isAnimePage ? 'Anime' : 'Drama';
+@endphp
+
 <footer class="border-t border-white/5 bg-neutral-950">
     <div class="mx-auto grid w-full max-w-7xl gap-10 px-6 py-14 lg:grid-cols-4 lg:px-8">
         <div class="lg:col-span-2">
-            <h3 class="text-xl font-bold text-white">Prasunk <span class="font-display text-2xl text-red-400">Drama</span></h3>
+            <h3 class="text-xl font-bold text-white">Prasunk<span class="font-display text-2xl text-red-400">{{ $brandSuffix }}</span></h3>
             <p class="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
                 Website streaming drama China & anime gratis subtitle Indonesia. Nikmati tontonan favorit dari berbagai platform dalam satu tempat dengan tampilan modern dan update rutin.
             </p>
@@ -28,6 +33,6 @@
     </div>
 
     <div class="border-t border-white/5 py-4 text-center text-xs text-neutral-500">
-        &copy; {{ date('Y') }} Prasunk Drama. Semua hak cipta dilindungi.
+        &copy; {{ date('Y') }} <span class="font-semibold text-neutral-400">Prasunk</span><span class="font-display text-base text-red-400">{{ $brandSuffix }}</span>. Semua hak cipta dilindungi.
     </div>
 </footer>
