@@ -53,6 +53,55 @@
         </div>
     </section>
 
+    {{-- Trending Swiper --}}
+    @if(!empty($trendingDramas))
+    <section class="mx-auto w-full max-w-7xl px-6 pb-6 lg:px-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="ri-fire-fill text-orange-500"></i> Trending di <span class="text-red-400">{{ $platforms[$selectedSource] ?? $selectedSource }}</span>
+            </h2>
+            <div class="flex items-center gap-2">
+                <button class="trending-prev flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-neutral-400 hover:text-white transition cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+                </button>
+                <button class="trending-next flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-neutral-400 hover:text-white transition cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="swiper trending-swiper overflow-hidden">
+            <div class="swiper-wrapper">
+                @foreach ($trendingDramas as $drama)
+                <div class="swiper-slide !w-[180px] sm:!w-[200px]">
+                    <article onclick="openDramaModal('{{ $drama['id'] }}', '{{ $drama['source'] }}')" class="group cursor-pointer rounded-2xl border border-white/5 bg-white/[0.02] p-3 transition-all duration-300 hover:border-red-500/20 hover:bg-white/[0.04]">
+                        <div class="mb-3 aspect-[3/4] w-full rounded-xl overflow-hidden bg-neutral-900">
+                            <img src="{{ $drama['cover'] }}" alt="{{ $drama['title'] }}" class="w-full h-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
+                        </div>
+                        <div class="space-y-1.5">
+                            <h3 class="text-sm font-semibold text-white truncate">{{ $drama['title'] }}</h3>
+                            <div class="flex items-center justify-between text-[10px]">
+                                <span class="rounded-full border border-white/10 px-2 py-0.5 text-neutral-300">{{ $drama['source_name'] }}</span>
+                                <span class="text-red-300"><i class="ri-star-fill text-[10px]"></i> {{ $drama['rating'] }}</span>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+                @endforeach
+            </div>
+        </div>
+    </section>
+    @endif
+
+    {{-- Section Pemisah --}}
+    <section class="mx-auto w-full max-w-7xl px-6 pb-4 lg:px-8">
+        <div class="border-t border-white/5 pt-8">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="ri-tv-2-line text-blue-400"></i> Terbaru dari <span class="text-red-400">{{ $platforms[$selectedSource] ?? $selectedSource }}</span>
+            </h2>
+            <p class="text-sm text-neutral-500 mt-1">Jelajahi drama terbaru dan temukan tontonan favoritmu</p>
+        </div>
+    </section>
+
     {{-- Drama Grid --}}
     <section id="daftar-drama" class="mx-auto w-full max-w-7xl px-6 pb-8 lg:px-8">
         @if($dramas->isEmpty())
@@ -65,7 +114,7 @@
             </div>
         @else
             <div class="grid grid-cols-2 gap-4 sm:gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                @foreach ($dramas as $drama)
+                @foreach ($dramas->take(12) as $drama)
                     <article onclick="openDramaModal('{{ $drama['id'] }}', '{{ $drama['source'] }}')" class="group cursor-pointer rounded-2xl border border-white/5 bg-white/[0.02] p-3 sm:p-4 transition-all duration-300 hover:border-red-500/20 hover:bg-white/[0.04]">
                         <div class="mb-3 sm:mb-4 aspect-[3/4] w-full rounded-xl overflow-hidden bg-neutral-900">
                             <img src="{{ $drama['cover'] }}" alt="{{ $drama['title'] }}" class="w-full h-full object-cover transition duration-500 group-hover:scale-105" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
@@ -74,7 +123,7 @@
                             <h2 class="text-sm sm:text-base font-semibold text-white truncate">{{ $drama['title'] }}</h2>
                             <div class="flex flex-wrap items-center justify-between gap-1 text-[10px] sm:text-xs">
                                 <span class="rounded-full border border-white/10 px-2 py-0.5 sm:px-2.5 sm:py-1 text-neutral-300">{{ $drama['source_name'] }}</span>
-                                <span class="text-red-300">⭐ {{ $drama['rating'] }}</span>
+                                <span class="text-red-300"><i class="ri-star-fill text-[10px]"></i> {{ $drama['rating'] }}</span>
                             </div>
                         </div>
                     </article>
@@ -179,5 +228,31 @@
 
     @push('scripts')
     <script src="{{ asset('js/prasunkDrama.js') }}"></script>
+    @if(!empty($trendingDramas))
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const swiper = new Swiper('.trending-swiper', {
+                slidesPerView: 'auto',
+                spaceBetween: 16,
+                grabCursor: true,
+                loop: true,
+                freeMode: {
+                    enabled: true,
+                    momentum: false,
+                },
+                autoplay: {
+                    delay: 0,
+                    disableOnInteraction: false,
+                    pauseOnMouseEnter: true,
+                },
+                speed: 2000,
+                navigation: {
+                    nextEl: '.trending-next',
+                    prevEl: '.trending-prev',
+                },
+            });
+        });
+    </script>
+    @endif
     @endpush
 </x-layout.app>

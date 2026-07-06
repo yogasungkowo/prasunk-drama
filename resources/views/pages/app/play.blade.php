@@ -34,10 +34,23 @@
         <div class="grid gap-8 lg:grid-cols-3">
             {{-- Video Player Col --}}
             <div class="lg:col-span-2 space-y-6">
+                {{-- HEVC Warning Banner (Hidden by default) --}}
+                <div id="hevc-warning" class="hidden flex items-start gap-4 rounded-3xl bg-amber-500/10 border border-amber-500/20 p-5 text-amber-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                        <h4 class="text-sm font-bold text-amber-400">Browser Anda mungkin tidak mendukung format video ini</h4>
+                        <p class="text-xs mt-1 text-amber-500/80 leading-relaxed">
+                            Video ini menggunakan format <b>HEVC (H.265)</b>. Jika Anda hanya mendengar suara namun layar tetap hitam/blank, silakan buka halaman ini menggunakan <b>Safari, Firefox, Microsoft Edge</b>, atau melalui <b>Browser HP (Android/iOS)</b>.
+                        </p>
+                    </div>
+                </div>
+
                 {{-- Video Container --}}
                 <div id="dramabox-player-container" class="aspect-video w-full rounded-3xl overflow-hidden border border-white/5 bg-neutral-900 shadow-2xl relative">
                     @if($videoData && !empty($videoData['videoUrl']))
-                        <video id="dramabox-player" class="video-js vjs-default-skin vjs-big-play-centered w-full h-full" controls preload="auto" autoplay></video>
+                        <video id="dramabox-player" class="video-js vjs-default-skin vjs-big-play-centered w-full h-full" controls preload="auto" autoplay playsinline data-source="{{ $source }}"></video>
                     @elseif($videoData && ($videoData['locked'] ?? false))
                         <div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-neutral-950/90">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -113,7 +126,33 @@
             </div>
 
             {{-- Playlist Col --}}
-            <div class="border border-white/5 bg-white/[0.01] rounded-3xl p-6 md:p-8 space-y-4 h-fit max-h-[80vh] overflow-y-auto no-scrollbar">
+            <div class="lg:hidden border border-white/5 bg-white/[0.01] rounded-3xl p-6 md:p-8 space-y-4 h-fit max-h-[60vh] overflow-y-auto no-scrollbar">
+                <div>
+                    <h3 class="text-lg font-bold text-white">Daftar Episode</h3>
+                    <p class="text-xs text-neutral-500 mt-1">Scroll untuk melihat episode lainnya</p>
+                </div>
+
+                <div id="daftar-episode-container-mobile" class="flex flex-nowrap gap-2 pt-2 border-t border-white/5 overflow-x-auto pb-2">
+                    @foreach($drama['episodes'] ?? [] as $ep)
+                        @php
+                            $isCurrent = $ep['number'] == $currentEpisode;
+                        @endphp
+                        <a 
+                            @if($ep['locked'])
+                                href="#"
+                                onclick="alert('Episode belum tersedia atau terkunci.'); return false;"
+                            @else
+                                href="?id={{ $drama['id'] }}&source={{ $source }}&ep={{ $ep['number'] }}"
+                            @endif
+                            class="flex-shrink-0 w-14 py-3 text-xs font-bold rounded-xl text-center transition {{ $isCurrent ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : ($ep['locked'] ? 'bg-white/5 text-neutral-600 cursor-not-allowed' : 'bg-white/[0.02] text-neutral-300 border border-white/5 hover:border-red-500/20 hover:text-red-400') }}">
+                            {{ $ep['number'] }}{{ $ep['locked'] ? ' 🔒' : '' }}
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Desktop Playlist --}}
+            <div class="hidden lg:block border border-white/5 bg-white/[0.01] rounded-3xl p-6 md:p-8 space-y-4 h-fit max-h-[80vh] overflow-y-auto no-scrollbar">
                 <div>
                     <h3 class="text-lg font-bold text-white">Daftar Episode</h3>
                     <p class="text-xs text-neutral-500 mt-1">Pilih episode untuk langsung memutar video</p>
@@ -141,10 +180,104 @@
     </div>
 
     @push('scripts')
+    @if($source === 'melolo')
+    <script src="{{ $upstreamBaseUrl }}/melolo-decrypt.js"></script>
+    @endif
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             let currentNextUrl = @json($nextEpisodeUrl);
             let currentHls = null;
+
+            const source = @json($source);
+            const isMelolo = source === 'melolo';
+            
+            if (isMelolo) {
+                const el = document.getElementById('dramabox-player');
+                if (el) {
+                    const checkActualVideoDecoding = () => {
+                        // Jika video berjalan tapi resolusinya 0x0, artinya browser gagal merender video track (hanya audio)
+                        if (el.videoWidth === 0 && el.readyState >= 2) {
+                            const warningBanner = document.getElementById('hevc-warning');
+                            if (warningBanner) warningBanner.classList.remove('hidden');
+                        } else if (el.videoWidth > 0) {
+                            const warningBanner = document.getElementById('hevc-warning');
+                            if (warningBanner) warningBanner.classList.add('hidden');
+                        }
+                    };
+                    el.addEventListener('loadeddata', checkActualVideoDecoding);
+                    el.addEventListener('playing', checkActualVideoDecoding);
+                }
+            }
+
+            function setupQualitySelector(player, hls) {
+                const levels = hls.levels;
+                if (!levels || levels.length <= 1) return;
+
+                const oldBtn = player.el().querySelector('.vjs-quality-selector');
+                if (oldBtn) oldBtn.remove();
+
+                const btn = document.createElement('button');
+                btn.className = 'vjs-quality-selector vjs-control vjs-button';
+                btn.innerHTML = '<span class="vjs-icon-placeholder">Auto</span>';
+
+                const menu = document.createElement('div');
+                menu.className = 'vjs-menu';
+                menu.innerHTML = '<div class="vjs-menu-content"></div>';
+
+                const content = menu.firstChild;
+
+                function addItem(label, levelIndex, selected) {
+                    const item = document.createElement('button');
+                    item.textContent = label;
+                    item.className = 'vjs-menu-item' + (selected ? ' vjs-selected' : '');
+                    item.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        hls.currentLevel = levelIndex;
+                        btn.querySelector('.vjs-icon-placeholder').textContent = label;
+                        content.querySelectorAll('.vjs-menu-item').forEach(i => i.classList.remove('vjs-selected'));
+                        item.classList.add('vjs-selected');
+                        menu.style.display = 'none';
+                    });
+                    content.appendChild(item);
+                }
+
+                addItem('Auto', -1, true);
+                levels.forEach((level, i) => {
+                    const label = (level.height ? level.height + 'p' : 'Level ' + i);
+                    addItem(label, i, false);
+                });
+
+                btn.appendChild(menu);
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+                });
+
+                const cb = player.controlBar.el();
+                const fs = player.controlBar.fullscreenToggle && player.controlBar.fullscreenToggle.el();
+                if (fs) fs.parentNode.insertBefore(btn, fs);
+                else cb.appendChild(btn);
+
+                document.addEventListener('click', () => { menu.style.display = 'none'; });
+            }
+
+            function rebuildQualitySelector(player) {
+                if (currentHls && currentHls.levels && currentHls.levels.length > 1) {
+                    setupQualitySelector(player, currentHls);
+                }
+            }
+
+            function updateEpisodeGrid(data) {
+                document.querySelectorAll('#daftar-episode-container a, #daftar-episode-container-mobile a').forEach(btn => {
+                    const rawText = btn.textContent.trim();
+                    const epNum = rawText.split(' ')[0];
+                    if (epNum == data.currentEpisode) {
+                        btn.className = "flex-shrink-0 w-14 py-3 text-xs font-bold rounded-xl text-center transition bg-red-600 text-white shadow-lg shadow-red-600/20";
+                    } else if (!rawText.includes('🔒')) {
+                        btn.className = "flex-shrink-0 w-14 py-3 text-xs font-bold rounded-xl text-center transition bg-white/[0.02] text-neutral-300 border border-white/5 hover:border-red-500/20 hover:text-red-400";
+                    }
+                });
+            }
 
             const initPlayer = () => {
                 const el = document.getElementById('dramabox-player');
@@ -153,37 +286,63 @@
                 const initialVideoUrl = @json($videoData['videoUrl'] ?? '');
                 if (!initialVideoUrl) return;
 
+                const source = el.dataset.source;
+                const isMelolo = source === 'melolo';
+
                 const handleVideoEnded = async () => {
                     const isAutoplay = document.getElementById('autoplay-toggle')?.checked;
                     if (isAutoplay && currentNextUrl) {
                         try {
-                            // Fetch next episode data dynamically
                             const res = await fetch(currentNextUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                             const data = await res.json();
                             
                             if (data.videoData && data.videoData.videoUrl && !data.videoData.locked) {
-                                // Update URL via pushState
                                 window.history.pushState({}, '', currentNextUrl);
                                 
                                 const newUrl = data.videoData.videoUrl;
-                                const isHLS = newUrl.includes('.m3u8') || newUrl.includes('/hls');
-                                const player = window.videojs(el);
-                                
-                                if (isHLS && window.Hls && window.Hls.isSupported()) {
-                                    if (currentHls) currentHls.destroy();
-                                    currentHls = new window.Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
-                                    currentHls.loadSource(newUrl);
-                                    currentHls.attachMedia(el);
-                                    currentHls.on(window.Hls.Events.MANIFEST_PARSED, () => player.play().catch(() => {}));
-                                } else if (isHLS && el.canPlayType('application/vnd.apple.mpegurl')) {
-                                    player.src({ src: newUrl, type: 'application/x-mpegURL' });
-                                    player.play().catch(() => {});
+                                if (isMelolo) {
+                                    el.classList.remove('video-js', 'vjs-default-skin', 'vjs-big-play-centered');
+                                    el.classList.add('w-full', 'h-full', 'rounded-3xl');
+                                    el.style.backgroundColor = 'black';
+
+                                    if (window.MeloloDecrypt) {
+                                        window.MeloloDecrypt.play(el, {
+                                            apiBase: window.location.origin,
+                                            bookId: @json($drama['id']),
+                                            episode: data.currentEpisode,
+                                            quality: '720p',
+                                            onProgress: (phase, msg) => console.log(`[Melolo] ${phase}: ${msg}`)
+                                        }).then(() => {
+                                            el.removeEventListener('ended', handleVideoEnded);
+                                            el.addEventListener('ended', handleVideoEnded);
+                                        }).catch(err => console.error('Melolo Decrypt Error:', err));
+                                    } else {
+                                        el.src = newUrl;
+                                        el.removeEventListener('ended', handleVideoEnded);
+                                        el.addEventListener('ended', handleVideoEnded);
+                                        el.play().catch(() => {});
+                                    }
                                 } else {
-                                    player.src({ src: newUrl, type: 'video/mp4' });
-                                    player.play().catch(() => {});
+                                    const player = window.videojs(el);
+                                    const isHLS = newUrl.includes('.m3u8') || newUrl.includes('/hls');
+                                    if (isHLS && window.Hls && window.Hls.isSupported()) {
+                                        if (currentHls) currentHls.destroy();
+                                        currentHls = new window.Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+                                        currentHls.loadSource(newUrl);
+                                        currentHls.attachMedia(el);
+                                        currentHls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+                                            player.play().catch(() => {});
+                                            rebuildQualitySelector(player);
+                                        });
+                                    } else if (isHLS && el.canPlayType('application/vnd.apple.mpegurl')) {
+                                        player.src({ src: newUrl, type: 'application/x-mpegURL' });
+                                        player.play().catch(() => {});
+                                    } else {
+                                        player.src({ src: newUrl, type: 'video/mp4' });
+                                        player.play().catch(() => {});
+                                    }
                                 }
                                 
-                                // Calculate next URL for the subsequent autoplay
                                 let found = false;
                                 currentNextUrl = null;
                                 for (const ep of data.drama.episodes) {
@@ -196,43 +355,79 @@
                                     if (ep.number == data.currentEpisode) found = true;
                                 }
                                 
-                                // Update UI grid
-                                document.querySelectorAll('#daftar-episode-container a').forEach(btn => {
-                                    // btn.textContent may contain '🔒', so we check start logic
-                                    const rawText = btn.textContent.trim();
-                                    const epNum = rawText.split(' ')[0]; // Extract just the number
-                                    if (epNum == data.currentEpisode) {
-                                        btn.className = "py-3 text-xs font-bold rounded-xl text-center transition bg-red-600 text-white shadow-lg shadow-red-600/20";
-                                    } else if (!rawText.includes('🔒')) {
-                                        btn.className = "py-3 text-xs font-bold rounded-xl text-center transition bg-white/[0.02] text-neutral-300 border border-white/5 hover:border-red-500/20 hover:text-red-400";
-                                    }
-                                });
+                                updateEpisodeGrid(data);
 
-                                // Update episode text in the title
                                 const epDisplay = document.getElementById('current-episode-display');
                                 if (epDisplay) epDisplay.innerText = data.currentEpisode;
                             } else {
-                                window.location.href = currentNextUrl; // Fallback
+                                window.location.href = currentNextUrl;
                             }
                         } catch (err) {
-                            window.location.href = currentNextUrl; // Fallback on error
+                            window.location.href = currentNextUrl;
                         }
                     }
                 };
 
-                const isHLS = initialVideoUrl.includes('.m3u8') || initialVideoUrl.includes('/hls');
-
                 if (window.videojs) {
-                    if (isHLS && window.Hls && window.Hls.isSupported()) {
-                        currentHls = new window.Hls({
-                            maxBufferLength: 30,
-                            maxMaxBufferLength: 60,
-                        });
+                    if (isMelolo) {
+                        el.classList.remove('video-js', 'vjs-default-skin', 'vjs-big-play-centered');
+                        el.classList.add('w-full', 'h-full', 'rounded-3xl');
+                        el.style.backgroundColor = 'black';
                         
-                        currentHls.loadSource(initialVideoUrl);
-                        currentHls.attachMedia(el);
-                        
-                        currentHls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+                        if (window.MeloloDecrypt) {
+                            window.MeloloDecrypt.play(el, {
+                                apiBase: window.location.origin,
+                                bookId: @json($drama['id']),
+                                episode: @json($currentEpisode),
+                                quality: '720p',
+                                onProgress: (phase, msg) => console.log(`[Melolo] ${phase}: ${msg}`)
+                            }).then(() => {
+                                el.addEventListener('ended', handleVideoEnded);
+                            }).catch(err => console.error('Melolo Decrypt Error:', err));
+                        } else {
+                            el.src = initialVideoUrl;
+                            el.addEventListener('ended', handleVideoEnded);
+                            el.play().catch(() => {});
+                        }
+                    } else {
+                        const isHLS = initialVideoUrl.includes('.m3u8') || initialVideoUrl.includes('/hls');
+
+                        if (isHLS && window.Hls && window.Hls.isSupported()) {
+                            currentHls = new window.Hls({
+                                maxBufferLength: 30,
+                                maxMaxBufferLength: 60,
+                            });
+                            
+                            currentHls.loadSource(initialVideoUrl);
+                            currentHls.attachMedia(el);
+                            
+                            currentHls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+                                const player = window.videojs(el, {
+                                    autoplay: true,
+                                    controls: true,
+                                    preload: 'auto',
+                                    playbackRates: [0.5, 1, 1.25, 1.5, 2],
+                                    sources: []
+                                });
+
+                                player.on('ended', handleVideoEnded);
+                                el.play().catch(() => {});
+                                rebuildQualitySelector(player);
+                            });
+                            
+                            currentHls.on(window.Hls.Events.ERROR, (event, data) => {
+                                if (data.fatal) {
+                                    if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
+                                        currentHls.startLoad();
+                                    } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+                                        currentHls.recoverMediaError();
+                                    } else {
+                                        currentHls.destroy();
+                                    }
+                                }
+                            });
+                        } else if (isHLS && el.canPlayType('application/vnd.apple.mpegurl')) {
+                            el.src = initialVideoUrl;
                             const player = window.videojs(el, {
                                 autoplay: true,
                                 controls: true,
@@ -240,43 +435,18 @@
                                 playbackRates: [0.5, 1, 1.25, 1.5, 2],
                                 sources: []
                             });
-
                             player.on('ended', handleVideoEnded);
                             el.play().catch(() => {});
-                        });
-                        
-                        currentHls.on(window.Hls.Events.ERROR, (event, data) => {
-                            if (data.fatal) {
-                                console.error('HLS fatal error:', data.type, data.details);
-                                if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
-                                    currentHls.startLoad();
-                                } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
-                                    currentHls.recoverMediaError();
-                                } else {
-                                    currentHls.destroy();
-                                }
-                            }
-                        });
-                    } else if (isHLS && el.canPlayType('application/vnd.apple.mpegurl')) {
-                        el.src = initialVideoUrl;
-                        const player = window.videojs(el, {
-                            autoplay: true,
-                            controls: true,
-                            preload: 'auto',
-                            playbackRates: [0.5, 1, 1.25, 1.5, 2],
-                            sources: []
-                        });
-                        player.on('ended', handleVideoEnded);
-                        el.play().catch(() => {});
-                    } else {
-                        const player = window.videojs(el, {
-                            autoplay: true,
-                            controls: true,
-                            preload: 'auto',
-                            playbackRates: [0.5, 1, 1.25, 1.5, 2],
-                        });
-                        player.on('ended', handleVideoEnded);
-                        player.src({ src: initialVideoUrl, type: 'video/mp4' });
+                        } else {
+                            const player = window.videojs(el, {
+                                autoplay: true,
+                                controls: true,
+                                preload: 'auto',
+                                playbackRates: [0.5, 1, 1.25, 1.5, 2],
+                            });
+                            player.on('ended', handleVideoEnded);
+                            player.src({ src: initialVideoUrl, type: 'video/mp4' });
+                        }
                     }
                 } else {
                     setTimeout(initPlayer, 100);

@@ -1,0 +1,217 @@
+--- resources/views/pages/anime/index.blade.php
++++ resources/views/pages/anime/index.blade.php
+@@ -49,54 +49,4 @@
+         </div>
+     </section>
+ 
+-    {{-- Completed Anime Section --}}
+-    @if(!empty($homeData['completed']['animeList']))
+-    <section class="mx-auto w-full max-w-7xl px-6 pb-6 lg:px-8">
+-        <div class="flex items-end justify-between mb-8">
+-            <div>
+-                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+-                    <i class="ri-checkbox-circle-fill text-green-500"></i> Rekomendasi Anime Tamat
+-                </h2>
+-                <p class="text-sm text-neutral-400 mt-1">Binge-watch anime yang sudah selesai</p>
+-            </div>
+-            <a href="{{ route('anime.complete') }}" class="hidden sm:flex items-center gap-1 text-sm font-medium text-red-400 hover:text-red-300 transition">
+-                Lihat Semua <i class="ri-arrow-right-line"></i>
+-            </a>
+-        </div>
+-        <div class="grid grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+-            @foreach (array_slice($homeData['completed']['animeList'], 0, 10) as $anime)
+-            @php $slug = $anime['animeId'] ?? ''; @endphp
+-            @continue(empty($slug))
+-            <a href="{{ route('anime.detail', $slug) }}" class="group relative flex flex-col rounded-2xl bg-neutral-900 border border-white/5 overflow-hidden hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-900/20">
+-                <div class="aspect-[3/4] w-full relative overflow-hidden bg-neutral-950">
+-                    <img src="{{ $anime['poster'] ?? '' }}" alt="{{ $anime['title'] }}" class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:opacity-80" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
+-                    <div class="absolute inset-0 bg-gradient-to-t from-neutral-900 via-neutral-900/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity"></div>
+-                    
+-                    @if(!empty($anime['episodes']))
+-                    <div class="absolute top-3 right-3 bg-neutral-800 text-white text-xs font-bold px-2.5 py-1 rounded-md shadow-lg backdrop-blur-md bg-opacity-90 border border-white/10">
+-                        {{ $anime['episodes'] }} Eps
+-                    </div>
+-                    @endif
+-                </div>
+-                <div class="p-4 flex flex-col flex-1 z-10 -mt-8">
+-                    <h3 class="text-sm sm:text-base font-semibold text-white line-clamp-2 group-hover:text-red-400 transition-colors drop-shadow-md">{{ $anime['title'] }}</h3>
+-                    <div class="mt-auto pt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+-                        <span class="inline-flex items-center gap-1.5 rounded-md bg-green-500/10 px-2 py-1 font-medium text-green-400">
+-                            <i class="ri-check-line"></i> Tamat
+-                        </span>
+-                        @if(!empty($anime['score']))
+-                        <span class="text-yellow-400 font-medium"><i class="ri-star-fill text-[10px]"></i> {{ $anime['score'] }}</span>
+-                        @endif
+-                    </div>
+-                </div>
+-            </a>
+-            @endforeach
+-        </div>
+-        <div class="mt-6 sm:hidden">
+-            <a href="{{ route('anime.complete') }}" class="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-white transition hover:bg-white/10">
+-                Lihat Semua Tamat <i class="ri-arrow-right-line"></i>
+-            </a>
+-        </div>
+-    </section>
+-    @endif
+-
+     {{-- Ongoing Anime / Terbaru Section --}}
+     <section class="mx-auto w-full max-w-7xl px-6 pb-4 lg:px-8">
+         <div class="border-t border-white/5 pt-8">
+             <h2 class="text-lg font-bold text-white flex items-center gap-2">
+-                <i class="ri-tv-2-line text-blue-400"></i> Terbaru dari <span class="text-red-400">Otakudesu</span>
++                <i class="ri-tv-2-line text-blue-400"></i> Anime Terbaru & Sedang Tayang
+             </h2>
+             <p class="text-sm text-neutral-500 mt-1">Jelajahi episode anime terbaru dan temukan tontonan favoritmu</p>
+         </div>
+     </section>
+ 
+     @if(!empty($ongoingAnime))
+     <section class="mx-auto w-full max-w-7xl px-6 pb-12 lg:px-8">
+-        <div class="grid grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
++        <div id="ongoingGrid" class="grid grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 relative transition-opacity duration-300">
+             @foreach ($ongoingAnime as $anime)
+             @php $slug = $anime['animeId'] ?? ''; @endphp
+             @continue(empty($slug))
+@@ -140,21 +90,65 @@
+             $prevPage = max(1, $currentPage - 1);
+             $nextPage = $currentPage + 1;
+         @endphp
+-        @if(count($ongoingAnime) >= 10)
+-        <nav class="flex items-center justify-center gap-2 mt-10">
+-            @if($currentPage > 1)
+-            <a href="{{ route('anime.index', ['page' => $prevPage]) }}" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-neutral-300 transition hover:border-red-500/30 hover:text-white hover:bg-red-500/10">
++        <nav id="ongoingPagination" class="flex items-center justify-center gap-2 mt-10" data-current-page="{{ $currentPage }}">
++            <button onclick="loadOngoingPage({{ $prevPage }})" class="btn-prev {{ $currentPage <= 1 ? 'hidden' : 'inline-flex' }} h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-neutral-300 transition hover:border-red-500/30 hover:text-white hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+-            </a>
+-            @endif
+-            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-red-600 text-sm font-semibold text-white shadow-lg shadow-red-600/30">{{ $currentPage }}</span>
+-            <a href="{{ route('anime.index', ['page' => $nextPage]) }}" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-neutral-300 transition hover:border-red-500/30 hover:text-white hover:bg-red-500/10">
++            </button>
++            <span class="page-indicator inline-flex h-10 w-10 items-center justify-center rounded-xl bg-red-600 text-sm font-semibold text-white shadow-lg shadow-red-600/30">{{ $currentPage }}</span>
++            <button onclick="loadOngoingPage({{ $nextPage }})" class="btn-next inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-neutral-300 transition hover:border-red-500/30 hover:text-white hover:bg-red-500/10">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+-            </a>
++            </button>
+         </nav>
+-        @endif
+     </section>
+     @endif
+ 
++    {{-- Completed Anime Section --}}
++    @if(!empty($homeData['completed']['animeList']))
++    <section class="mx-auto w-full max-w-7xl px-6 pb-16 lg:px-8">
++        <div class="flex items-end justify-between mb-8 border-t border-white/5 pt-8">
++            <div>
++                <h2 class="text-2xl font-bold text-white flex items-center gap-2">
++                    <i class="ri-checkbox-circle-fill text-green-500"></i> Rekomendasi Anime Tamat
++                </h2>
++                <p class="text-sm text-neutral-400 mt-1">Binge-watch anime yang sudah selesai</p>
++            </div>
++            <a href="{{ route('anime.complete') }}" class="hidden sm:flex items-center gap-1 text-sm font-medium text-red-400 hover:text-red-300 transition">
++                Lihat Semua <i class="ri-arrow-right-line"></i>
++            </a>
++        </div>
++        <div class="grid grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
++            @foreach (array_slice($homeData['completed']['animeList'], 0, 10) as $anime)
++            @php $slug = $anime['animeId'] ?? ''; @endphp
++            @continue(empty($slug))
++            <a href="{{ route('anime.detail', $slug) }}" class="group relative flex flex-col rounded-2xl bg-neutral-900 border border-white/5 overflow-hidden hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-900/20">
++                <div class="aspect-[3/4] w-full relative overflow-hidden bg-neutral-950">
++                    <img src="{{ $anime['poster'] ?? '' }}" alt="{{ $anime['title'] }}" class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:opacity-80" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
++                    <div class="absolute inset-0 bg-gradient-to-t from-neutral-900 via-neutral-900/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity"></div>
++                    
++                    @if(!empty($anime['episodes']))
++                    <div class="absolute top-3 right-3 bg-neutral-800 text-white text-xs font-bold px-2.5 py-1 rounded-md shadow-lg backdrop-blur-md bg-opacity-90 border border-white/10">
++                        {{ $anime['episodes'] }} Eps
++                    </div>
++                    @endif
++                </div>
++                <div class="p-4 flex flex-col flex-1 z-10 -mt-8">
++                    <h3 class="text-sm sm:text-base font-semibold text-white line-clamp-2 group-hover:text-red-400 transition-colors drop-shadow-md">{{ $anime['title'] }}</h3>
++                    <div class="mt-auto pt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
++                        <span class="inline-flex items-center gap-1.5 rounded-md bg-green-500/10 px-2 py-1 font-medium text-green-400">
++                            <i class="ri-check-line"></i> Tamat
++                        </span>
++                        @if(!empty($anime['score']))
++                        <span class="text-yellow-400 font-medium"><i class="ri-star-fill text-[10px]"></i> {{ $anime['score'] }}</span>
++                        @endif
++                    </div>
++                </div>
++            </a>
++            @endforeach
++        </div>
++        <div class="mt-6 sm:hidden">
++            <a href="{{ route('anime.complete') }}" class="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-white transition hover:bg-white/10">
++                Lihat Semua Tamat <i class="ri-arrow-right-line"></i>
++            </a>
++        </div>
++    </section>
++    @endif
++
+     @push('scripts')
+     <script>
+@@ -233,6 +227,62 @@
+                     }
+                 });
+             }
+         });
++
++        function loadOngoingPage(page) {
++            const grid = document.getElementById('ongoingGrid');
++            const nav = document.getElementById('ongoingPagination');
++            if (!grid || !nav) return;
++
++            grid.classList.add('opacity-50');
++            
++            fetch(`/anime/ongoing-ajax?page=${page}`)
++                .then(res => res.json())
++                .then(res => {
++                    if(res.data && res.data.length > 0) {
++                        let html = '';
++                        res.data.forEach(anime => {
++                            const slug = anime.animeId || anime.slug || '';
++                            if(!slug) return;
++                            
++                            html += `
++                                <a href="/anime/anime/${slug}" class="group relative flex flex-col rounded-2xl bg-neutral-900 border border-white/5 overflow-hidden hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-900/20">
++                                    <div class="aspect-[3/4] w-full relative overflow-hidden bg-neutral-950">
++                                        <img src="${anime.poster || ''}" alt="${anime.title || ''}" class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:opacity-80" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
++                                        <div class="absolute inset-0 bg-gradient-to-t from-neutral-900 via-neutral-900/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity"></div>
++                                        
++                                        ${anime.episodes ? `
++                                        <div class="absolute top-3 right-3 bg-red-600 text-white text-xs font-bold px-2.5 py-1 rounded-md shadow-lg backdrop-blur-md bg-opacity-90">
++                                            Ep ${anime.episodes}
++                                        </div>` : ''}
++                                    </div>
++                                    <div class="p-4 flex flex-col flex-1 z-10 -mt-8">
++                                        <h3 class="text-sm sm:text-base font-semibold text-white line-clamp-2 group-hover:text-red-400 transition-colors drop-shadow-md">${anime.title || ''}</h3>
++                                        <div class="mt-auto pt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
++                                            <span class="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1 font-medium text-neutral-300">
++                                                <i class="ri-calendar-line text-neutral-400"></i> ${anime.releaseDay || 'Ongoing'}
++                                            </span>
++                                            <span class="text-neutral-400">${anime.latestReleaseDate || ''}</span>
++                                        </div>
++                                    </div>
++                                </a>
++                            `;
++                        });
++                        
++                        grid.innerHTML = html;
++                        
++                        // Update pagination state
++                        nav.setAttribute('data-current-page', page);
++                        nav.querySelector('.page-indicator').textContent = page;
++                        nav.querySelector('.btn-prev').setAttribute('onclick', `loadOngoingPage(${Math.max(1, page - 1)})`);
++                        nav.querySelector('.btn-next').setAttribute('onclick', `loadOngoingPage(${page + 1})`);
++                        
++                        if(page <= 1) nav.querySelector('.btn-prev').classList.replace('inline-flex', 'hidden');
++                        else nav.querySelector('.btn-prev').classList.replace('hidden', 'inline-flex');
++                    }
++                    grid.classList.remove('opacity-50');
++                })
++                .catch(err => { console.error('Failed to load pagination:', err); grid.classList.remove('opacity-50'); });
++        }
+     </script>
+     <style>

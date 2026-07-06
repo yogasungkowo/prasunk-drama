@@ -45,40 +45,26 @@ class DramaController extends Controller
         }
 
         $dramas = [];
+        $trendingDramas = [];
 
         try {
-            if ($searchQuery) {
-                $params = [];
-                if ($selectedSource === 'dramabox') {
-                    $params['q'] = $searchQuery;
-                    $params['lang'] = 'id';
-                } else {
-                    $params['query'] = $searchQuery;
-                    if ($selectedSource === 'reelshort') {
-                        $params['lang'] = 'id';
-                    }
-                }
-                $response = Http::withHeaders([
-                    'X-API-Key' => $this->apiKey,
-                    'User-Agent' => 'Mozilla/5.0'
-                ])->get("{$this->baseUrl}/{$selectedSource}/search", $params);
-            } else {
-                $params = [];
-                if ($selectedSource === 'reelshort' || $selectedSource === 'dramabox') {
-                    $params['lang'] = 'id';
-                }
-                $response = Http::withHeaders([
-                    'X-API-Key' => $this->apiKey,
-                    'User-Agent' => 'Mozilla/5.0'
-                ])->get("{$this->baseUrl}/{$selectedSource}/trending", $params);
+            $params = [];
+            if ($selectedSource === 'reelshort' || $selectedSource === 'dramabox' || $selectedSource === 'melolo') {
+                $params['lang'] = 'id';
             }
 
-            if ($response->successful()) {
-                $data = $response->json();
+            // Always fetch trending data for the Swiper carousel
+            $trendingResponse = Http::withHeaders([
+                'X-API-Key' => $this->apiKey,
+                'User-Agent' => 'Mozilla/5.0'
+            ])->get("{$this->baseUrl}/{$selectedSource}/trending", $params);
+
+            if ($trendingResponse->successful()) {
+                $data = $trendingResponse->json();
                 $items = $data['items'] ?? [];
 
-                foreach ($items as $item) {
-                    $dramas[] = [
+                foreach ($items as $index => $item) {
+                    $formatted = [
                         'id' => $item['id'] ?? $item['dramaId'] ?? '',
                         'title' => $item['title'] ?? 'Unknown Title',
                         'description' => $item['description'] ?? $item['synopsis'] ?? 'No synopsis available.',
@@ -88,6 +74,47 @@ class DramaController extends Controller
                         'source' => $selectedSource,
                         'source_name' => $this->sources[$selectedSource] ?? ucfirst($selectedSource)
                     ];
+                    $dramas[] = $formatted;
+                    if ($index < 10) {
+                        $trendingDramas[] = $formatted;
+                    }
+                }
+            }
+
+            // If search query, fetch search results (overrides main list)
+            if ($searchQuery) {
+                $searchParams = [];
+                if ($selectedSource === 'dramabox') {
+                    $searchParams['q'] = $searchQuery;
+                    $searchParams['lang'] = 'id';
+                } else {
+                    $searchParams['query'] = $searchQuery;
+                    if ($selectedSource === 'reelshort') {
+                        $searchParams['lang'] = 'id';
+                    }
+                }
+                $searchResponse = Http::withHeaders([
+                    'X-API-Key' => $this->apiKey,
+                    'User-Agent' => 'Mozilla/5.0'
+                ])->get("{$this->baseUrl}/{$selectedSource}/search", $searchParams);
+
+                if ($searchResponse->successful()) {
+                    $data = $searchResponse->json();
+                    $items = $data['items'] ?? [];
+                    $dramas = [];
+
+                    foreach ($items as $item) {
+                        $dramas[] = [
+                            'id' => $item['id'] ?? $item['dramaId'] ?? '',
+                            'title' => $item['title'] ?? 'Unknown Title',
+                            'description' => $item['description'] ?? $item['synopsis'] ?? 'No synopsis available.',
+                            'cover' => $item['cover'] ?? $item['posterImg'] ?? 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop',
+                            'episodes' => $item['episodes'] ?? $item['totalEpisodes'] ?? 0,
+                            'rating' => isset($item['rating']) ? number_format($item['rating'], 1) : number_format(8.0 + (hexdec(substr(md5($item['title'] ?? 'rating'), 0, 1)) / 7.5), 1),
+                            'source' => $selectedSource,
+                            'source_name' => $this->sources[$selectedSource] ?? ucfirst($selectedSource)
+                        ];
+                    }
                 }
             }
         } catch (\Exception $e) {
@@ -95,7 +122,7 @@ class DramaController extends Controller
         }
 
         $allDramasCollection = collect($dramas);
-        $perPage = 12;
+        $perPage = 10;
         $currentPage = $request->input('page', 1);
         $currentItems = $allDramasCollection->slice(($currentPage - 1) * $perPage, $perPage)->values();
 
@@ -109,6 +136,7 @@ class DramaController extends Controller
 
         return view('pages.app.index', [
             'dramas' => $paginatedDramas,
+            'trendingDramas' => $trendingDramas,
             'platforms' => $this->sources,
             'selectedSource' => $selectedSource,
             'searchQuery' => $searchQuery
@@ -292,7 +320,7 @@ class DramaController extends Controller
                     'id' => $id,
                     'ep' => $ep
                 ];
-                if ($source === 'reelshort') {
+                if ($source === 'reelshort' || $source === 'melolo') {
                     $params['lang'] = 'id';
                 }
                 $videoResponse = Http::withHeaders([
@@ -303,17 +331,25 @@ class DramaController extends Controller
                 if ($videoResponse->successful()) {
                     $videoData = $videoResponse->json();
 
-                    // If the API provides an hlsUrl, proxy it through Laravel
-                    // to avoid CORS issues with CDN domains (e.g. DramaWave).
-                    // We explicitly limit this to dramawave since reelshort's CDN supports CORS natively
-                    // and their upstream API has a bug rejecting ep=0.
                     $rawHlsUrl = $videoData['hlsUrl'] ?? '';
-                    if (!empty($rawHlsUrl) && $source === 'dramawave') {
-                        $parsedUrl = parse_url($rawHlsUrl);
-                        $queryString = $parsedUrl['query'] ?? '';
-                        parse_str($queryString, $hlsParams);
-                        $hlsParams['source'] = $source;
-                        $videoData['videoUrl'] = route('drama.hls', $hlsParams, false);
+                    if (!empty($rawHlsUrl)) {
+                        if ($source === 'dramawave') {
+                            // Proxy Dramawave HLS (m3u8 with CDN redirect)
+                            $parsedUrl = parse_url($rawHlsUrl);
+                            $queryString = $parsedUrl['query'] ?? '';
+                            parse_str($queryString, $hlsParams);
+                            $hlsParams['source'] = $source;
+                            $videoData['videoUrl'] = route('drama.hls', $hlsParams, false);
+                        } elseif ($source === 'melolo') {
+                            // Melolo: hlsUrl returns clean MP4 (server-decrypted CENC AES-128-CTR).
+                            // Proxy through our server to attach API key server-side.
+                            $videoData['videoUrl'] = route('drama.hls', [
+                                'id' => $id,
+                                'ep' => $ep,
+                                'source' => $source,
+                                'lang' => 'id',
+                            ], false);
+                        }
                     }
                 }
             }
@@ -334,7 +370,8 @@ class DramaController extends Controller
             'source' => $source,
             'currentEpisode' => $ep,
             'videoData' => $videoData,
-            'platforms' => $this->sources
+            'platforms' => $this->sources,
+            'upstreamBaseUrl' => str_replace('/api', '', $this->baseUrl)
         ]);
     }
 
@@ -374,10 +411,31 @@ class DramaController extends Controller
         }
     }
 
+    public function meloloEpisodeProxy(Request $request)
+    {
+        $response = Http::withHeaders([
+            'X-API-Key' => $this->apiKey,
+            'User-Agent' => 'Mozilla/5.0'
+        ])->get("{$this->baseUrl}/melolo/episode", $request->query());
+
+        return response($response->body(), $response->status(), ['Content-Type' => 'application/json']);
+    }
+
+    public function meloloKeyProxy(Request $request)
+    {
+        $response = Http::withHeaders([
+            'X-API-Key' => $this->apiKey,
+            'User-Agent' => 'Mozilla/5.0'
+        ])->get("{$this->baseUrl}/melolo/key", $request->query());
+
+        return response($response->body(), $response->status(), ['Content-Type' => 'application/json']);
+    }
+
     /**
-     * Proxy HLS playlist from upstream API.
-     * Handles both direct m3u8 responses (DramaBox) and 302 redirects to CDN (DramaWave).
-     * Rewrites relative segment URLs to absolute CDN URLs so hls.js can fetch them directly.
+     * Proxy HLS playlist / stream from upstream API.
+     * - For dramabox/dramawave etc.: handles m3u8 with optional 302→CDN redirect,
+     *   rewrites relative segment URLs to absolute CDN URLs so hls.js can fetch them.
+     * - For melolo: pass-through of server-decrypted MP4 (CENC AES-128-CTR).
      */
     public function proxyHls(Request $request)
     {
@@ -390,11 +448,67 @@ class DramaController extends Controller
         }
 
         try {
-            // Build the upstream HLS URL
+            // ── Melolo: stream MP4 with range request support ──
+            if ($source === 'melolo') {
+                $upstreamParams = array_filter($request->query(), fn($key) => !in_array($key, ['source']), ARRAY_FILTER_USE_KEY);
+
+                $upstreamHeaders = [
+                    'X-API-Key' => $this->apiKey,
+                    'User-Agent' => 'Mozilla/5.0',
+                ];
+
+                if ($request->header('Range')) {
+                    $upstreamHeaders['Range'] = $request->header('Range');
+                }
+
+                try {
+                    $client = new \GuzzleHttp\Client(['stream' => true, 'timeout' => 300]);
+                    $guzzleResponse = $client->get("{$this->baseUrl}/{$source}/hls", [
+                        'query' => $upstreamParams,
+                        'headers' => $upstreamHeaders,
+                        'allow_redirects' => [
+                            'max' => 5,
+                            'track_redirects' => true,
+                        ],
+                    ]);
+
+                    $statusCode = $guzzleResponse->getStatusCode();
+                    $body = $guzzleResponse->getBody();
+
+                    $responseHeaders = [
+                        'Content-Type' => $guzzleResponse->getHeaderLine('Content-Type') ?: 'video/mp4',
+                        'Access-Control-Allow-Origin' => '*',
+                        'Accept-Ranges' => 'bytes',
+                        'Cache-Control' => 'public, max-age=3600',
+                    ];
+
+                    if ($guzzleResponse->hasHeader('Content-Range')) {
+                        $responseHeaders['Content-Range'] = $guzzleResponse->getHeaderLine('Content-Range');
+                        $statusCode = 206;
+                    }
+                    if ($guzzleResponse->hasHeader('Content-Length')) {
+                        $responseHeaders['Content-Length'] = $guzzleResponse->getHeaderLine('Content-Length');
+                    }
+
+                    return response()->stream(function () use ($body) {
+                        while (ob_get_level() > 0) {
+                            ob_end_clean();
+                        }
+                        while (!$body->eof()) {
+                            echo $body->read(65536);
+                            flush();
+                            if (connection_aborted()) break;
+                        }
+                    }, $statusCode, $responseHeaders);
+                } catch (\GuzzleHttp\Exception\RequestException $e) {
+                    return response('Melolo stream error: ' . $e->getMessage(), 502);
+                }
+            }
+
+            // ── Other sources: HLS (m3u8) handling ──
             $upstreamUrl = "{$this->baseUrl}/{$source}/hls";
             $params = array_filter($request->query(), fn($key) => !in_array($key, ['source']), ARRAY_FILTER_USE_KEY);
 
-            // Use withoutRedirecting() so we can handle 302 manually
             $response = Http::withHeaders([
                 'X-API-Key' => $this->apiKey,
                 'User-Agent' => 'Mozilla/5.0'
@@ -404,13 +518,11 @@ class DramaController extends Controller
             $cdnBaseUrl = null;
 
             if ($response->status() === 302 || $response->status() === 301) {
-                // Follow redirect manually and fetch m3u8 from CDN server-side
                 $cdnUrl = $response->header('Location');
                 if (!$cdnUrl) {
                     return response('Redirect location missing', 502);
                 }
 
-                // Extract CDN base URL for rewriting relative segments
                 $cdnBaseUrl = substr($cdnUrl, 0, strrpos($cdnUrl, '/') + 1);
 
                 $cdnResponse = Http::withHeaders([
@@ -423,23 +535,19 @@ class DramaController extends Controller
                     return response('Failed to fetch HLS from CDN', $cdnResponse->status());
                 }
             } elseif ($response->successful()) {
-                // Direct m3u8 response (e.g. DramaBox)
                 $m3u8Body = $response->body();
             } else {
                 return response('Failed to fetch HLS playlist', $response->status());
             }
 
-            // Rewrite relative segment URLs to absolute CDN URLs
             if ($m3u8Body && $cdnBaseUrl) {
                 $lines = explode("\n", $m3u8Body);
                 $rewritten = [];
                 foreach ($lines as $line) {
                     $trimmed = trim($line);
-                    // If line is not a comment/tag and not empty and not already absolute
                     if ($trimmed !== '' && !str_starts_with($trimmed, '#') && !str_starts_with($trimmed, 'http')) {
                         $rewritten[] = $cdnBaseUrl . $trimmed;
                     } elseif (str_contains($trimmed, 'URI="') && !str_contains($trimmed, 'URI="http')) {
-                        // Rewrite URI= references in tags like #EXT-X-MAP:URI="init.mp4"
                         $rewritten[] = preg_replace('/URI="([^"]+)"/', 'URI="' . $cdnBaseUrl . '$1"', $trimmed);
                     } else {
                         $rewritten[] = $trimmed;

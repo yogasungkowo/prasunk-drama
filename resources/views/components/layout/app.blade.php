@@ -49,7 +49,7 @@
         <div class="pointer-events-none fixed inset-0 -z-10 bg-linear-to-b from-red-950/20 via-neutral-950 to-neutral-950"></div>
         <div class="pointer-events-none fixed -top-60 left-1/2 -translate-x-1/2 -z-10 h-[500px] w-[800px] rounded-full bg-red-600/8 blur-3xl"></div>
 
-        <x-partials.navbar :platforms="$platforms" :selectedSource="$selectedSource" />
+                <x-partials.navbar :platforms="$platforms ?? []" :selectedSource="$selectedSource ?? 'dramabox'" />
         <main>
             {{ $slot }}
         </main>

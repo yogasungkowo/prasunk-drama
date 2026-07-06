@@ -16,6 +16,7 @@
     "dependencies": {
         "hls.js": "^1.6.16",
         "remixicon": "^4.9.1",
+        "swiper": "^14.0.1",
         "video.js": "^8.23.9"
     }
 }
