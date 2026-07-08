@@ -18,7 +18,12 @@ if (searchInput && suggestionBox) {
         const selectedSource = urlParams.get('source') || 'dramabox';
 
         searchTimeout = setTimeout(() => {
-            fetch(`/drama/suggest?source=${selectedSource}&query=${encodeURIComponent(query)}`)
+            fetch(`/drama/suggest?source=${selectedSource}&query=${encodeURIComponent(query)}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+            })
                 .then(res => res.json())
                 .then(data => {
                     if (data.length === 0) {
@@ -74,7 +79,12 @@ function openDramaModal(id, source) {
     loading.classList.remove('hidden');
     content.classList.add('hidden');
 
-    fetch(`/drama/detail?id=${id}&source=${source}`)
+    fetch(`/drama/detail?id=${id}&source=${source}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+        },
+    })
         .then(res => res.json())
         .then(response => {
             if (response.code === 200 && response.data) {

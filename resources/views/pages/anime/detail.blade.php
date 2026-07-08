@@ -1,5 +1,6 @@
 @php
     $synopsisText = 'Detail anime subtitle Indonesia.';
+    $poster = $anime['poster'] ?? $anime['cover'] ?? $anime['thumbnail'] ?? '';
     if(isset($anime['synopsis']) && is_array($anime['synopsis'])) {
         $synopsisText = implode(' ', $anime['synopsis']['paragraphs'] ?? []);
     } elseif(is_string($anime['synopsis'] ?? null)) {
@@ -21,7 +22,13 @@
             <div class="w-full lg:w-1/3 xl:w-1/4 shrink-0">
                 <div class="aspect-[3/4] rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl relative group">
                     <div class="absolute inset-0 bg-gradient-to-t from-neutral-900 via-transparent to-transparent z-10 opacity-60"></div>
-                    <img src="{{ $anime['poster'] ?? '' }}" alt="{{ $anime['title'] ?? '' }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
+                    @if($poster)
+                    <img src="{{ $poster }}" alt="{{ $anime['title'] ?? '' }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
+                    @else
+                    <div class="flex h-full w-full items-center justify-center bg-linear-to-br from-neutral-900 via-neutral-800 to-red-950/30">
+                        <i class="ri-movie-2-line text-6xl text-red-400/70"></i>
+                    </div>
+                    @endif
                 </div>
 
                 <div class="mt-6 p-5 rounded-2xl bg-neutral-900/50 border border-white/5 backdrop-blur-sm space-y-4">
@@ -139,7 +146,7 @@
                 @if(is_array($episodes) && count($episodes) > 0 && !isset($episodes[0]) && !is_array($episodes))
                     {{-- handle if it's just a number string --}}
                 @elseif(is_array($episodes) && count($episodes) > 0)
-                <div>
+                <div id="episodes">
                     <div class="flex items-end justify-between mb-6">
                         <div>
                             <h3 class="text-xl font-bold text-white flex items-center gap-2">

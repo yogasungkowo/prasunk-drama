@@ -334,7 +334,12 @@
             container.appendChild(loadingOverlay);
 
             try {
-                const res = await fetch(`/anime/server/${serverId}`);
+                const res = await fetch(`/anime/server/${serverId}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                });
                 const data = await res.json();
                 
                 const embedUrl = data?.data?.url ?? data?.url ?? '';

@@ -3,18 +3,18 @@
 @endphp
 
 <header class="sticky top-0 z-50 border-b border-white/5 bg-neutral-950/80 backdrop-blur-xl">
-    <nav class="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 lg:px-8">
-        <a href="{{ $isAnimePage ? route('anime.index') : '/' }}" class="text-2xl sm:text-3xl font-bold text-white tracking-tight transition hover:text-red-300 shrink-0">
-            Prasunk<span class="font-display font-normal text-3xl sm:text-4xl text-red-400">{{ $isAnimePage ? 'Anime' : 'Drama' }}</span>
+    <nav class="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
+        <a href="{{ $isAnimePage ? route('anime.index') : '/' }}" class="shrink-0 text-xl font-bold tracking-tight text-white transition hover:text-red-300 sm:text-3xl">
+            Prasunk<span class="font-display text-2xl font-normal text-red-400 sm:text-4xl">{{ $isAnimePage ? 'Anime' : 'Drama' }}</span>
         </a>
 
         <div class="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4">
             {{-- Drama / Anime Toggle --}}
             <div class="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.02] p-0.5 shrink-0 whitespace-nowrap">
-                <a href="/" class="px-2 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition {{ request()->is('anime*') ? 'text-neutral-400 hover:text-white' : 'bg-red-950/50 text-red-400 border border-red-900/30' }}">
+                <a href="/" class="rounded-full px-2 py-1 text-[9px] font-medium transition sm:px-3 sm:py-1.5 sm:text-xs {{ request()->is('anime*') ? 'text-neutral-400 hover:text-white' : 'bg-red-950/50 text-red-400 border border-red-900/30' }}">
                     Drama
                 </a>
-                <a href="{{ route('anime.index') }}" class="px-2 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition {{ request()->is('anime*') ? 'bg-red-950/50 text-red-400 border border-red-900/30' : 'text-neutral-400 hover:text-white' }}">
+                <a href="{{ route('anime.index') }}" class="rounded-full px-2 py-1 text-[9px] font-medium transition sm:px-3 sm:py-1.5 sm:text-xs {{ request()->is('anime*') ? 'bg-red-950/50 text-red-400 border border-red-900/30' : 'text-neutral-400 hover:text-white' }}">
                     Anime
                 </a>
             </div>
@@ -31,11 +31,13 @@
             @push('scripts')
             <script>
                 document.addEventListener('DOMContentLoaded', () => {
-                    const navSearchInput = document.getElementById('navAnimeSearchInput');
-                    const navSuggestionBox = document.getElementById('navAnimeSuggestionBox');
-                    let navSearchTimeout = null;
+                    const initAnimeNavSearch = (inputId, boxId, containerId) => {
+                        const navSearchInput = document.getElementById(inputId);
+                        const navSuggestionBox = document.getElementById(boxId);
+                        let navSearchTimeout = null;
 
-                    if (navSearchInput && navSuggestionBox) {
+                        if (!navSearchInput || !navSuggestionBox) return;
+
                         navSearchInput.addEventListener('input', function() {
                             const query = this.value.trim();
                             clearTimeout(navSearchTimeout);
@@ -46,7 +48,12 @@
                             }
 
                             navSearchTimeout = setTimeout(() => {
-                                fetch(`/anime/search-ajax?q=${encodeURIComponent(query)}`)
+                                fetch(`/anime/search-ajax?q=${encodeURIComponent(query)}`, {
+                                    headers: {
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                        'Accept': 'application/json',
+                                    },
+                                })
                                     .then(res => res.json())
                                     .then(data => {
                                         if (data.length === 0) {
@@ -91,12 +98,15 @@
                         });
 
                         document.addEventListener('click', function(e) {
-                            const container = document.getElementById('navAnimeSearchContainer');
+                            const container = document.getElementById(containerId);
                             if (container && !container.contains(e.target)) {
                                 navSuggestionBox.classList.add('hidden');
                             }
                         });
-                    }
+                    };
+
+                    initAnimeNavSearch('navAnimeSearchInput', 'navAnimeSuggestionBox', 'navAnimeSearchContainer');
+                    initAnimeNavSearch('navAnimeMobileSearchInput', 'navAnimeMobileSuggestionBox', 'navAnimeMobileSearchContainer');
                 });
             </script>
             @endpush
@@ -146,4 +156,34 @@
             @endif
         </div>
     </nav>
+    @if($isAnimePage)
+    <div class="border-t border-white/5 px-3 py-2 sm:hidden">
+        <div class="relative mx-auto w-full max-w-7xl" id="navAnimeMobileSearchContainer">
+            <input type="text" id="navAnimeMobileSearchInput" autocomplete="off" placeholder="Cari anime..." class="w-full rounded-full border border-white/10 bg-white/[0.03] px-4 py-2.5 pr-10 text-sm text-white placeholder-neutral-500 transition focus:border-red-500/50 focus:bg-white/[0.05] focus:outline-none">
+            <div class="pointer-events-none absolute right-4 top-2.5 text-neutral-400">
+                <i class="ri-search-line"></i>
+            </div>
+            <div id="navAnimeMobileSuggestionBox" class="absolute left-0 right-0 mt-2 hidden max-h-[320px] overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900/98 p-2 shadow-2xl backdrop-blur-xl no-scrollbar"></div>
+        </div>
+    </div>
+    <div class="border-t border-white/5">
+        <div class="mx-auto flex w-full max-w-7xl gap-1.5 overflow-x-auto px-3 py-2 sm:gap-2 sm:px-6 lg:px-8 no-scrollbar">
+            <a href="{{ route('anime.unlimited') }}" class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium leading-none transition sm:px-4 sm:text-xs {{ request()->routeIs('anime.unlimited') ? 'border-red-500/40 bg-red-500/15 text-red-200' : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200' }}">
+                Katalog Anime
+            </a>
+            <a href="{{ route('anime.ongoing') }}" class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium leading-none transition sm:px-4 sm:text-xs {{ request()->routeIs('anime.ongoing') ? 'border-red-500/40 bg-red-500/15 text-red-200' : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200' }}">
+                Sedang Tayang
+            </a>
+            <a href="{{ route('anime.complete') }}" class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium leading-none transition sm:px-4 sm:text-xs {{ request()->routeIs('anime.complete') ? 'border-red-500/40 bg-red-500/15 text-red-200' : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200' }}">
+                Anime Tamat
+            </a>
+            <a href="{{ route('anime.genre') }}" class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium leading-none transition sm:px-4 sm:text-xs {{ request()->routeIs('anime.genre') || request()->routeIs('anime.genre.list') ? 'border-red-500/40 bg-red-500/15 text-red-200' : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200' }}">
+                Genre
+            </a>
+            <a href="{{ route('anime.schedule') }}" class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium leading-none transition sm:px-4 sm:text-xs {{ request()->routeIs('anime.schedule') ? 'border-red-500/40 bg-red-500/15 text-red-200' : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200' }}">
+                Jadwal Rilis
+            </a>
+        </div>
+    </div>
+    @endif
 </header>

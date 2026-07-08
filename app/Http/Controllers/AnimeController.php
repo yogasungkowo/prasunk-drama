@@ -97,6 +97,10 @@ class AnimeController extends Controller
         }
 
         if (!$anime) {
+            $anime = $this->findAnimeFallback($slug);
+        }
+
+        if (!$anime) {
             return redirect('/anime')->with('error', 'Anime not found');
         }
 
@@ -400,9 +404,86 @@ class AnimeController extends Controller
         return response()->json(['error' => 'Failed to fetch server URL'], 500);
     }
 
-    public function unlimited()
+    public function unlimited(Request $request)
     {
         $animeList = [];
+        $perPage = 25;
+        $currentPage = max(1, (int) $request->input('page', 1));
+        $filters = [
+            'q' => trim((string) $request->input('q', '')),
+            'sort' => (string) ($request->input('sort', 'newest') ?: 'newest'),
+            'genre' => (string) ($request->input('genre', '') ?? ''),
+            'status' => (string) ($request->input('status', '') ?? ''),
+            'type' => (string) ($request->input('type', '') ?? ''),
+        ];
+
+        $genreOptions = $this->fetchAnimeGenreOptions();
+        $statusFilter = $this->normalizedAnimeStatus($filters['status']);
+
+        if ($filters['genre']) {
+            $animeList = $this->fetchAnimeByGenre($filters['genre']);
+        } elseif ($statusFilter === 'Ongoing') {
+            $animeList = $this->fetchAnimeByStatus('ongoing');
+            if (empty($animeList)) {
+                $animeList = $this->fetchUnlimitedAnimeList();
+            }
+        } elseif ($statusFilter === 'Complete') {
+            $animeList = $this->fetchAnimeByStatus('complete');
+            if (empty($animeList)) {
+                $animeList = $this->fetchUnlimitedAnimeList();
+            }
+        } else {
+            $animeList = $this->fetchUnlimitedAnimeList();
+        }
+
+        $animeList = array_values(array_filter($animeList, fn ($anime) => is_array($anime)));
+        $filterOptions = $this->buildUnlimitedFilterOptions($animeList, $genreOptions);
+        $filteredAnime = $this->filterUnlimitedAnime($animeList, $filters);
+        $pageItems = array_slice($filteredAnime, ($currentPage - 1) * $perPage, $perPage);
+        $pageItems = $this->enrichAnimeDetails($pageItems);
+
+        if (($filters['sort'] ?? '') === 'rating') {
+            usort($pageItems, fn ($a, $b) => $this->animeRatingValue($b) <=> $this->animeRatingValue($a));
+        }
+
+        $paginatedAnime = new LengthAwarePaginator(
+            $pageItems,
+            count($filteredAnime),
+            $perPage,
+            $currentPage,
+            [
+                'path' => $request->url(),
+                'query' => $request->except('page'),
+            ]
+        );
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'html' => view('pages.anime.partials.unlimited-results', [
+                    'animeList' => $paginatedAnime,
+                ])->render(),
+                'summary' => view('pages.anime.partials.unlimited-summary', [
+                    'animeList' => $paginatedAnime,
+                ])->render(),
+                'total' => $paginatedAnime->total(),
+            ]);
+        }
+
+        return view('pages.anime.unlimited', [
+            'animeList' => $paginatedAnime,
+            'filters' => $filters,
+            'filterOptions' => $filterOptions,
+        ]);
+    }
+
+    private function fetchUnlimitedAnimeList(): array
+    {
+        $cacheKey = 'anime-unlimited-list:v2';
+        $cached = Cache::get($cacheKey);
+
+        if (!empty($cached)) {
+            return $cached;
+        }
 
         try {
             $response = Http::withHeaders([
@@ -410,15 +491,441 @@ class AnimeController extends Controller
             ])->get("{$this->baseUrl}/anime/unlimited");
 
             if ($response->successful()) {
-                $animeList = $response->json()['data'] ?? [];
+                $animeList = $this->normalizeUnlimitedAnimeList($response->json()['data'] ?? []);
+
+                if (!empty($animeList)) {
+                    Cache::put($cacheKey, $animeList, now()->addHours(6));
+                }
+
+                return $animeList;
             }
         } catch (\Exception $e) {
-            // Silence
+            return [];
         }
 
-        return view('pages.anime.unlimited', [
-            'animeList' => $animeList,
-        ]);
+        return [];
+    }
+
+    private function fetchAnimeByGenre(string $genreSlug): array
+    {
+        $cacheKey = "anime-genre-list:v2:{$genreSlug}";
+        $cached = Cache::get($cacheKey);
+
+        if (!empty($cached)) {
+            return $cached;
+        }
+
+        $animeList = [];
+
+        for ($page = 1; $page <= 30; $page++) {
+            try {
+                $response = Http::withHeaders([
+                    'User-Agent' => 'Mozilla/5.0'
+                ])->get("{$this->baseUrl}/anime/genre/{$genreSlug}", ['page' => $page]);
+
+                if (!$response->successful()) {
+                    break;
+                }
+
+                $items = $response->json()['data']['animeList'] ?? [];
+
+                if (empty($items)) {
+                    break;
+                }
+
+                foreach ($items as $anime) {
+                    if (is_array($anime)) {
+                        $anime['genreList'] = $anime['genreList'] ?? [[
+                            'title' => str($genreSlug)->replace('-', ' ')->title()->toString(),
+                            'genreId' => $genreSlug,
+                        ]];
+                        $animeList[] = $this->normalizeAnimeCard($anime);
+                    }
+                }
+
+                if (count($items) < 10) {
+                    break;
+                }
+            } catch (\Exception $e) {
+                break;
+            }
+        }
+
+        if (!empty($animeList)) {
+            Cache::put($cacheKey, $animeList, now()->addHours(3));
+        }
+
+        return $animeList;
+    }
+
+    private function fetchAnimeByStatus(string $status): array
+    {
+        $status = $status === 'ongoing' ? 'ongoing' : 'complete';
+        $cacheKey = "anime-status-list:v1:{$status}";
+        $cached = Cache::get($cacheKey);
+
+        if (!empty($cached)) {
+            return $cached;
+        }
+
+        $endpoint = $status === 'ongoing' ? 'ongoing-anime' : 'complete-anime';
+        $label = $status === 'ongoing' ? 'Ongoing' : 'Complete';
+        $animeList = [];
+
+        for ($page = 1; $page <= 80; $page++) {
+            try {
+                $response = Http::withHeaders([
+                    'User-Agent' => 'Mozilla/5.0'
+                ])->get("{$this->baseUrl}/anime/{$endpoint}", ['page' => $page]);
+
+                if (!$response->successful()) {
+                    break;
+                }
+
+                $items = $response->json()['data']['animeList'] ?? [];
+
+                if (empty($items)) {
+                    break;
+                }
+
+                foreach ($items as $anime) {
+                    if (is_array($anime)) {
+                        $anime['status'] = $label;
+                        $animeList[] = $this->normalizeAnimeCard($anime);
+                    }
+                }
+
+                if (count($items) < 10) {
+                    break;
+                }
+            } catch (\Exception $e) {
+                break;
+            }
+        }
+
+        if (!empty($animeList)) {
+            Cache::put($cacheKey, $animeList, now()->addHours(3));
+        }
+
+        return $animeList;
+    }
+
+    private function fetchAnimeGenreOptions(): array
+    {
+        $cacheKey = 'anime-genre-options:v2';
+        $cached = Cache::get($cacheKey);
+
+        if (!empty($cached)) {
+            return $cached;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0'
+            ])->get("{$this->baseUrl}/anime/genre");
+
+            if (!$response->successful()) {
+                return [];
+            }
+
+            $genres = $response->json()['data']['genreList'] ?? [];
+            $options = [];
+
+            foreach ($genres as $genre) {
+                $title = is_string($genre) ? $genre : ($genre['title'] ?? $genre['name'] ?? $genre['genreName'] ?? '');
+                $slug = is_string($genre)
+                    ? \Illuminate\Support\Str::slug($genre)
+                    : ($genre['genreId'] ?? $genre['slug'] ?? \Illuminate\Support\Str::slug($title));
+
+                if ($title && $slug) {
+                    $options[$slug] = $title;
+                }
+            }
+
+            asort($options);
+
+            if (!empty($options)) {
+                Cache::put($cacheKey, $options, now()->addHours(6));
+            }
+
+            return $options;
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function enrichAnimeDetails(array $animeList): array
+    {
+        return array_map(function ($anime) {
+            $anime = $this->normalizeAnimeCard($anime);
+            $animeId = $anime['animeId'] ?? $anime['slug'] ?? $anime['id'] ?? '';
+
+            if (!$animeId || (!empty($anime['poster']) && (!empty($anime['score']) || !empty($anime['rating'])))) {
+                return $anime;
+            }
+
+            $detail = $this->fetchAnimeDetail($animeId);
+
+            return $this->mergeAnimeCardDetail($anime, is_array($detail) ? $detail : []);
+        }, $animeList);
+    }
+
+    private function fetchAnimeDetail(string $animeId): array
+    {
+        $cacheKey = "anime-card-detail:v2:{$animeId}";
+        $cached = Cache::get($cacheKey);
+
+        if (!empty($cached)) {
+            return $cached;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0'
+            ])->get("{$this->baseUrl}/anime/anime/{$animeId}");
+
+            if ($response->successful()) {
+                $detail = $response->json()['data'] ?? $response->json();
+
+                if (!empty($detail) && is_array($detail)) {
+                    Cache::put($cacheKey, $detail, now()->addHours(12));
+                    return $detail;
+                }
+            }
+        } catch (\Exception $e) {
+            return [];
+        }
+
+        return [];
+    }
+
+    private function findAnimeFallback(string $slug): ?array
+    {
+        $detail = $this->fetchAnimeDetail($slug);
+
+        if (!empty($detail)) {
+            return $detail;
+        }
+
+        foreach ($this->fetchUnlimitedAnimeList() as $anime) {
+            $keys = [
+                $anime['animeId'] ?? '',
+                $anime['slug'] ?? '',
+                $anime['id'] ?? '',
+            ];
+
+            if (in_array($slug, array_filter($keys), true)) {
+                return $this->normalizeAnimeCard($anime);
+            }
+        }
+
+        return null;
+    }
+
+    private function mergeAnimeCardDetail(array $anime, array $detail): array
+    {
+        foreach (['poster', 'cover', 'thumbnail', 'score', 'rating', 'status', 'type', 'episodes', 'duration', 'genreList', 'genre'] as $key) {
+            if (empty($anime[$key]) && !empty($detail[$key])) {
+                $anime[$key] = $detail[$key];
+            }
+        }
+
+        if (empty($anime['poster'])) {
+            $anime['poster'] = $detail['poster'] ?? $detail['cover'] ?? $detail['thumbnail'] ?? '';
+        }
+
+        return $this->normalizeAnimeCard($anime);
+    }
+
+    private function normalizeUnlimitedAnimeList(array $data): array
+    {
+        if (isset($data['animeList']) && is_array($data['animeList'])) {
+            return array_map(fn ($anime) => $this->normalizeAnimeCard($anime), $data['animeList']);
+        }
+
+        if (isset($data['list']) && is_array($data['list'])) {
+            $animeList = [];
+
+            foreach ($data['list'] as $group) {
+                $startWith = $group['startWith'] ?? '';
+
+                foreach (($group['animeList'] ?? []) as $anime) {
+                    if (!is_array($anime)) {
+                        continue;
+                    }
+
+                    if ($startWith !== '') {
+                        $anime['startWith'] = $startWith;
+                    }
+
+                    $animeList[] = $this->normalizeAnimeCard($anime);
+                }
+            }
+
+            return $animeList;
+        }
+
+        return array_is_list($data)
+            ? array_map(fn ($anime) => $this->normalizeAnimeCard($anime), $data)
+            : [];
+    }
+
+    private function normalizeAnimeCard(array $anime): array
+    {
+        $anime['slug'] = $anime['animeId'] ?? $anime['slug'] ?? $anime['id'] ?? '';
+        $anime['animeId'] = $anime['animeId'] ?? $anime['slug'];
+        $anime['type'] = $anime['type'] ?? 'Anime';
+
+        if (empty($anime['status']) && !empty($anime['title'])) {
+            $anime['status'] = str_contains(strtolower($anime['title']), 'on-going') ? 'Ongoing' : 'Complete';
+        }
+
+        return $anime;
+    }
+
+    private function buildUnlimitedFilterOptions(array $animeList, array $genreOptions = []): array
+    {
+        $genres = $genreOptions;
+        $statuses = [
+            'Ongoing' => 'Ongoing',
+            'Complete' => 'Complete',
+        ];
+        $types = [];
+
+        foreach ($animeList as $anime) {
+            foreach ($this->extractGenreOptions($anime) as $genre) {
+                $genres[$genre['slug']] = $genre['title'];
+            }
+
+            $status = trim((string) ($anime['status'] ?? ''));
+            if ($status !== '') {
+                $statuses[$status] = $status;
+            }
+
+            $type = trim((string) ($anime['type'] ?? ''));
+            if ($type !== '') {
+                $types[$type] = $type;
+            }
+        }
+
+        asort($genres);
+        natcasesort($statuses);
+        natcasesort($types);
+
+        return [
+            'genres' => $genres,
+            'statuses' => array_values($statuses),
+            'types' => array_values($types),
+        ];
+    }
+
+    private function filterUnlimitedAnime(array $animeList, array $filters): array
+    {
+        $filtered = array_values(array_filter($animeList, function ($anime) use ($filters) {
+            if ($filters['q'] !== '') {
+                $keyword = strtolower($filters['q']);
+                $haystack = strtolower(implode(' ', array_filter([
+                    $anime['title'] ?? '',
+                    $anime['japanese'] ?? '',
+                    $anime['synopsis'] ?? '',
+                    $anime['description'] ?? '',
+                ], 'is_string')));
+
+                if (!str_contains($haystack, $keyword)) {
+                    return false;
+                }
+            }
+
+            if ($filters['genre'] !== '') {
+                $genreSlugs = array_column($this->extractGenreOptions($anime), 'slug');
+                if (!in_array($filters['genre'], $genreSlugs, true)) {
+                    return false;
+                }
+            }
+
+            if ($filters['status'] !== '' && $this->normalizedAnimeStatus((string) ($anime['status'] ?? '')) !== $this->normalizedAnimeStatus($filters['status'])) {
+                return false;
+            }
+
+            if ($filters['type'] !== '' && strcasecmp((string) ($anime['type'] ?? ''), $filters['type']) !== 0) {
+                return false;
+            }
+
+            return true;
+        }));
+
+        $sort = $filters['sort'] ?? 'newest';
+
+        if ($sort === 'az') {
+            usort($filtered, fn ($a, $b) => strcasecmp($a['title'] ?? '', $b['title'] ?? ''));
+        } elseif ($sort === 'za') {
+            usort($filtered, fn ($a, $b) => strcasecmp($b['title'] ?? '', $a['title'] ?? ''));
+        } elseif ($sort === 'oldest') {
+            $filtered = array_reverse($filtered);
+        } elseif ($sort === 'rating') {
+            usort($filtered, fn ($a, $b) => $this->animeRatingValue($b) <=> $this->animeRatingValue($a));
+        }
+
+        return $filtered;
+    }
+
+    private function extractGenreOptions(array $anime): array
+    {
+        $genres = $anime['genreList'] ?? $anime['genres'] ?? $anime['genre'] ?? [];
+
+        if (is_string($genres)) {
+            $genres = array_map('trim', explode(',', $genres));
+        }
+
+        if (!is_array($genres)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(function ($genre) {
+            $title = is_string($genre)
+                ? $genre
+                : ($genre['title'] ?? $genre['name'] ?? $genre['genreName'] ?? '');
+            $slug = is_string($genre)
+                ? \Illuminate\Support\Str::slug($genre)
+                : ($genre['genreId'] ?? $genre['slug'] ?? \Illuminate\Support\Str::slug($title));
+
+            if (!$title || !$slug) {
+                return null;
+            }
+
+            return [
+                'title' => $title,
+                'slug' => $slug,
+            ];
+        }, $genres)));
+    }
+
+    private function animeRatingValue(array $anime): float
+    {
+        $rating = $anime['score'] ?? $anime['rating'] ?? 0;
+
+        if (is_string($rating)) {
+            $rating = preg_replace('/[^0-9.]/', '', $rating);
+        }
+
+        return (float) $rating;
+    }
+
+    private function normalizedAnimeStatus(string $status): string
+    {
+        $status = strtolower(trim($status));
+        $status = str_replace(['-', '_'], ' ', $status);
+        $status = preg_replace('/\s+/', ' ', $status) ?? $status;
+
+        if (in_array($status, ['ongoing', 'on going', 'on air', 'airing'], true)) {
+            return 'Ongoing';
+        }
+
+        if (in_array($status, ['complete', 'completed', 'tamat', 'finished'], true)) {
+            return 'Complete';
+        }
+
+        return $status ? str($status)->title()->toString() : '';
     }
 
     private function getRelatedAnimeByGenre($genres, array $exclude = [], int $limit = 10): ?array

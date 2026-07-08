@@ -1,40 +1,83 @@
 <x-layout.app title="Prasunk Anime - Nonton & Streaming Anime Sub Indo" description="Nonton streaming anime subtitle Indonesia gratis. Anime ongoing, anime tamat, dan rekomendasi anime terbaru setiap hari.">
+    @php
+        $heroAnime = collect($ongoingAnime ?? [])
+            ->filter(fn ($anime) => !empty($anime['animeId']) && !empty($anime['poster']))
+            ->sortByDesc(function ($anime) {
+                $rating = $anime['score'] ?? $anime['rating'] ?? 0;
+                return (float) preg_replace('/[^0-9.]/', '', (string) $rating);
+            })
+            ->take(5)
+            ->values()
+            ->all();
+    @endphp
 
     {{-- Hero Section --}}
-    <section class="mx-auto w-full max-w-7xl px-6 pt-12 pb-12 lg:px-8 lg:pt-14">
-        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div class="max-w-2xl">
-                <p class="font-display text-7xl text-red-400">Streaming Anime Gratis</p>
-                <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">Daftar Anime <span class="text-red-500">Sub Indo</span></h1>
-                <p class="mt-4 text-base leading-relaxed text-neutral-400">
-                    Nonton streaming anime subtitle Indonesia gratis & terupdate. Update episode terbaru setiap hari dengan kualitas HD.
-                </p>
-            </div>
-
-            <div class="w-full md:max-w-xs relative" id="animeSearchContainer">
-                <div class="relative">
-                    <input type="text" id="animeSearchInput" autocomplete="off" placeholder="Cari anime favoritmu..." class="w-full bg-white/[0.02] border border-white/10 rounded-full px-5 py-2.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-red-500/50 transition">
-                    <div class="absolute right-4 top-3 text-neutral-400">
-                        <i class="ri-search-line"></i>
+    <section class="relative overflow-hidden">
+        <div class="mx-auto w-full max-w-7xl px-3 pt-4 pb-6 sm:px-6 sm:pt-6 sm:pb-8 lg:px-8 lg:pt-8">
+            <div id="animeHeroSlider" class="relative min-h-[540px] overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 shadow-2xl shadow-black/40 sm:min-h-[520px] sm:rounded-3xl lg:min-h-[560px]">
+                @forelse ($heroAnime as $index => $anime)
+                    @php
+                        $slug = $anime['animeId'] ?? '';
+                        $rating = $anime['score'] ?? $anime['rating'] ?? '';
+                        $watchUrl = route('anime.detail', $slug) . '#episodes';
+                    @endphp
+                    <article class="anime-hero-slide absolute inset-0 transition-opacity duration-700 {{ $index === 0 ? 'is-active opacity-100' : 'opacity-0' }}" data-hero-slide>
+                        <div class="anime-hero-bg absolute inset-0 bg-cover bg-center transition-transform duration-[6500ms] ease-out" style="background-image: url('{{ $anime['cover'] ?? $anime['poster'] ?? '' }}');"></div>
+                        <div class="absolute inset-0 bg-neutral-950/45 sm:hidden"></div>
+                        <div class="absolute inset-0 bg-linear-to-r from-neutral-950 via-neutral-950/82 to-neutral-950/35"></div>
+                        <div class="absolute inset-0 bg-linear-to-t from-neutral-950 via-neutral-950/45 to-neutral-950/45 sm:via-transparent sm:to-neutral-950/35"></div>
+                        <div class="relative z-10 grid min-h-[540px] items-end gap-8 px-4 pt-8 pb-20 sm:min-h-[520px] sm:px-8 sm:py-8 lg:min-h-[560px] lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center lg:px-12">
+                            <div class="max-w-2xl">
+                                <div class="mb-3 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase text-neutral-200 sm:mb-4 sm:text-xs">
+                                    <span class="rounded-full border border-red-500/30 bg-red-500/15 px-2.5 py-1 text-red-200 sm:px-3">Ongoing Teratas</span>
+                                    @if($rating)
+                                    <span class="inline-flex items-center gap-1 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-2.5 py-1 text-yellow-300 sm:px-3">
+                                        <i class="ri-star-fill"></i> {{ $rating }}
+                                    </span>
+                                    @endif
+                                    @if(!empty($anime['releaseDay']))
+                                    <span class="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-neutral-200 sm:px-3">{{ $anime['releaseDay'] }}</span>
+                                    @endif
+                                </div>
+                                <p class="font-display text-4xl text-red-300 sm:text-7xl">Prasunk Anime</p>
+                                <h1 class="mt-3 text-2xl font-extrabold leading-tight text-white sm:text-5xl lg:text-6xl">{{ $anime['title'] }}</h1>
+                                <p class="mt-4 max-w-xl text-xs leading-relaxed text-neutral-300 sm:text-base">
+                                    Anime ongoing dengan skor tertinggi dari koleksi terbaru. Tonton update episode subtitle Indonesia dengan tampilan yang nyaman.
+                                </p>
+                                <div class="mt-6 flex flex-wrap gap-3 sm:mt-7">
+                                    <a href="{{ $watchUrl }}" class="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-red-950/30 transition hover:bg-red-500 sm:px-5 sm:text-sm">
+                                        <i class="ri-play-fill text-base sm:text-lg"></i> Tonton Sekarang
+                                    </a>
+                                    <a href="{{ route('anime.detail', $slug) }}" class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-3 text-xs font-semibold text-white backdrop-blur transition hover:border-white/25 hover:bg-white/15 sm:px-5 sm:text-sm">
+                                        <i class="ri-information-line text-base sm:text-lg"></i> Detail
+                                    </a>
+                                </div>
+                            </div>
+                            <a href="{{ route('anime.detail', $slug) }}" class="group hidden overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-3 shadow-2xl shadow-black/30 lg:block">
+                                <div class="aspect-[3/4] overflow-hidden rounded-xl bg-neutral-900">
+                                    <img src="{{ $anime['poster'] ?? '' }}" alt="{{ $anime['title'] }}" class="h-full w-full object-cover transition duration-700 group-hover:scale-105" loading="{{ $index === 0 ? 'eager' : 'lazy' }}" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
+                                </div>
+                            </a>
+                        </div>
+                    </article>
+                @empty
+                    <div class="relative min-h-[520px] bg-neutral-950 px-5 py-10 sm:px-8 lg:px-12">
+                        <div class="flex min-h-[460px] max-w-2xl flex-col justify-center">
+                            <p class="font-display text-6xl text-red-300 sm:text-7xl">Streaming Anime Gratis</p>
+                            <h1 class="mt-3 text-4xl font-extrabold text-white sm:text-5xl">Daftar Anime <span class="text-red-500">Sub Indo</span></h1>
+                            <p class="mt-4 text-base leading-relaxed text-neutral-400">Nonton streaming anime subtitle Indonesia gratis dan terupdate setiap hari.</p>
+                        </div>
                     </div>
-                </div>
-                <div id="animeSuggestionBox" class="absolute left-0 right-0 mt-2 z-50 hidden rounded-2xl border border-white/5 bg-neutral-900/98 p-2 shadow-2xl backdrop-blur-xl max-h-[380px] overflow-y-auto no-scrollbar"></div>
-            </div>
-        </div>
+                @endforelse
 
-        <div class="mt-8 flex flex-wrap items-center gap-3">
-            <a href="{{ route('anime.ongoing') }}" class="group relative overflow-hidden rounded-full border border-red-500/30 bg-red-500/10 px-5 py-2 text-sm font-medium text-red-300 transition-all hover:border-red-500/50 hover:bg-red-500/20 hover:shadow-[0_0_20px_rgba(239,68,68,0.2)]">
-                Sedang Tayang
-            </a>
-            <a href="{{ route('anime.complete') }}" class="rounded-full border border-white/10 bg-white/[0.03] px-5 py-2 text-sm font-medium text-neutral-300 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white">
-                Anime Tamat
-            </a>
-            <a href="{{ route('anime.genre') }}" class="rounded-full border border-white/10 bg-white/[0.03] px-5 py-2 text-sm font-medium text-neutral-300 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white">
-                Genre
-            </a>
-            <a href="{{ route('anime.schedule') }}" class="rounded-full border border-white/10 bg-white/[0.03] px-5 py-2 text-sm font-medium text-neutral-300 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white">
-                Jadwal Rilis
-            </a>
+                @if(count($heroAnime) > 1)
+                <div class="absolute bottom-7 left-4 z-20 flex gap-2 sm:bottom-5 sm:left-auto sm:right-8 lg:right-12">
+                    @foreach ($heroAnime as $index => $anime)
+                    <button type="button" class="hero-dot h-2.5 rounded-full transition-all {{ $index === 0 ? 'w-8 bg-red-500' : 'w-2.5 bg-white/35 hover:bg-white/60' }}" data-hero-dot="{{ $index }}" aria-label="Slide anime {{ $index + 1 }}"></button>
+                    @endforeach
+                </div>
+                @endif
+            </div>
         </div>
     </section>
 
@@ -160,6 +203,44 @@
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const heroSlider = document.getElementById('animeHeroSlider');
+            const heroSlides = heroSlider ? Array.from(heroSlider.querySelectorAll('[data-hero-slide]')) : [];
+            const heroDots = heroSlider ? Array.from(heroSlider.querySelectorAll('[data-hero-dot]')) : [];
+            let activeHeroSlide = 0;
+            let heroTimer = null;
+
+            const showHeroSlide = (nextIndex) => {
+                if (heroSlides.length <= 1) return;
+                activeHeroSlide = (nextIndex + heroSlides.length) % heroSlides.length;
+                heroSlides.forEach((slide, index) => {
+                    const active = index === activeHeroSlide;
+                    slide.classList.toggle('is-active', active);
+                    slide.classList.toggle('opacity-100', active);
+                    slide.classList.toggle('opacity-0', !active);
+                });
+                heroDots.forEach((dot, index) => {
+                    const active = index === activeHeroSlide;
+                    dot.classList.toggle('w-8', active);
+                    dot.classList.toggle('w-2.5', !active);
+                    dot.classList.toggle('bg-red-500', active);
+                    dot.classList.toggle('bg-white/35', !active);
+                });
+            };
+
+            const startHeroSlider = () => {
+                if (heroSlides.length <= 1) return;
+                window.clearInterval(heroTimer);
+                heroTimer = window.setInterval(() => showHeroSlide(activeHeroSlide + 1), 6500);
+            };
+
+            heroDots.forEach((dot) => {
+                dot.addEventListener('click', () => {
+                    showHeroSlide(Number(dot.dataset.heroDot || 0));
+                    startHeroSlider();
+                });
+            });
+            startHeroSlider();
+
             const searchInput = document.getElementById('animeSearchInput');
             const suggestionBox = document.getElementById('animeSuggestionBox');
             let searchTimeout = null;
@@ -175,7 +256,12 @@
                     }
 
                     searchTimeout = setTimeout(() => {
-                        fetch(`/anime/search-ajax?q=${encodeURIComponent(query)}`)
+                        fetch(`/anime/search-ajax?q=${encodeURIComponent(query)}`, {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json',
+                            },
+                        })
                             .then(res => res.json())
                             .then(data => {
                                 if (data.length === 0) {
@@ -246,7 +332,12 @@
                 button.classList.add('opacity-50', 'cursor-wait');
             });
             
-            fetch(`/anime/ongoing-ajax?page=${page}`)
+            fetch(`/anime/ongoing-ajax?page=${page}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+            })
                 .then(res => res.json())
                 .then(res => {
                     if(res.data && res.data.length > 0) {
@@ -322,6 +413,9 @@
         }
         .custom-scrollbar:hover::-webkit-scrollbar-thumb {
             background-color: rgba(255, 255, 255, 0.2);
+        }
+        .anime-hero-slide.is-active .anime-hero-bg {
+            transform: scale(1.08);
         }
     </style>
     @endpush

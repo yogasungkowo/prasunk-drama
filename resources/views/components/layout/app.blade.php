@@ -40,6 +40,10 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('assets/favicon/favicon-16x16.png') }}">
     <link rel="manifest" href="{{ asset('assets/favicon/site.webmanifest') }}">
 
+    <link rel="stylesheet" href="{{ asset('css/select2.min.css') }}">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="{{ asset('js/select2.min.js') }}"></script>
+    
     @vite('resources/css/app.css')
     @vite('resources/js/app.js')
     @stack('styles')
