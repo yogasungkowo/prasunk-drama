@@ -29,6 +29,10 @@ Route::prefix('anime')->name('anime.')->group(function () {
     Route::get('/search-ajax', [AnimeController::class, 'searchAjax'])->middleware(['frontend.ajax', 'throttle:frontend-api'])->name('search.ajax');
     Route::get('/search/{keyword}', [AnimeController::class, 'search'])->name('search');
     Route::get('/unlimited', [AnimeController::class, 'unlimited'])->name('unlimited');
+    Route::get('/movies', [AnimeController::class, 'movies'])->name('movies');
+    Route::get('/movies/server/{serverId}', [AnimeController::class, 'movieServer'])->middleware(['frontend.ajax', 'throttle:frontend-api'])->name('movies.server');
+    Route::get('/movies/episode/{slug}', [AnimeController::class, 'movieEpisode'])->name('movies.episode');
+    Route::get('/movies/{slug}', [AnimeController::class, 'movieDetail'])->name('movies.detail');
     Route::get('/anime/{slug}', [AnimeController::class, 'detail'])->name('detail');
     Route::get('/episode/{slug}', [AnimeController::class, 'episode'])->name('episode');
     Route::get('/batch/{slug}', [AnimeController::class, 'batch'])->name('batch');

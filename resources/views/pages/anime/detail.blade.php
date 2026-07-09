@@ -183,10 +183,9 @@
             </div>
         </div>
 
-        @include('components.anime.related-grid', [
-            'relatedAnime' => $relatedAnime ?? null,
-            'sectionClass' => 'mt-12',
-        ])
+        <x-anime.related-grid :relatedAnime="$relatedAnime ?? null" sectionClass="mt-12" />
+
+        <x-anime.recommended-grid :recommendedAnime="$recommendedAnimeList ?? []" sectionClass="mt-12" />
     </div>
 
 </x-layout.app>

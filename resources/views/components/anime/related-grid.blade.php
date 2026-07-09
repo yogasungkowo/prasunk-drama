@@ -1,6 +1,7 @@
+@props(['relatedAnime' => null, 'sectionClass' => 'mt-12'])
+
 @php
-    $related = $relatedAnime ?? null;
-    $sectionClass = $sectionClass ?? 'mt-12';
+    $related = $relatedAnime;
 @endphp
 
 @if(!empty($related['animeList']))

@@ -199,10 +199,7 @@
             </main>
         </div>
 
-        @include('components.anime.related-grid', [
-            'relatedAnime' => $relatedAnime ?? null,
-            'sectionClass' => 'mt-12',
-        ])
+        <x-anime.related-grid :relatedAnime="$relatedAnime ?? null" sectionClass="mt-12" />
         @else
         <div class="text-center py-20 border border-white/5 rounded-2xl bg-white/[0.01]">
             <h3 class="text-lg font-semibold text-white">Batch tidak ditemukan</h3>

@@ -28,27 +28,9 @@
                     @if(!empty($animeList))
                     <div class="border border-white/5 bg-white/[0.02] rounded-3xl p-6 md:p-8 backdrop-blur-sm">
                         <h2 class="text-xl font-bold text-white mb-6 border-b border-white/10 pb-4 inline-block">{{ $dayName }}</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                             @foreach ($animeList as $anime)
-                            @php $slug = $anime['animeId'] ?? $anime['slug'] ?? $anime['id'] ?? ''; @endphp
-                            @if($slug)
-                            <a href="{{ route('anime.detail', $slug) }}" class="flex items-center gap-4 p-3 rounded-2xl hover:bg-white/5 transition-all group border border-transparent hover:border-red-500/20">
-                                <div class="w-16 h-20 rounded-xl overflow-hidden bg-neutral-900 shrink-0 shadow-lg">
-                                    <img src="{{ $anime['poster'] ?? $anime['cover'] ?? $anime['thumbnail'] ?? '' }}" alt="" class="w-full h-full object-cover transition duration-300 group-hover:scale-110" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <h3 class="text-sm font-semibold text-white line-clamp-2 group-hover:text-red-400 transition">{{ $anime['title'] ?? '' }}</h3>
-                                    <p class="text-xs text-neutral-500 mt-1">
-                                        @if(!empty($anime['episodes']))
-                                        {{ $anime['episodes'] }} Eps
-                                        @endif
-                                        @if(!empty($anime['score']))
-                                        <span class="text-yellow-400 ml-2"><i class="ri-star-fill"></i> {{ $anime['score'] }}</span>
-                                        @endif
-                                    </p>
-                                </div>
-                            </a>
-                            @endif
+                            <x-anime.card :anime="$anime" />
                             @endforeach
                         </div>
                     </div>

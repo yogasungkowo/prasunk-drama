@@ -183,6 +183,9 @@
             <a href="{{ route('anime.schedule') }}" class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium leading-none transition sm:px-4 sm:text-xs {{ request()->routeIs('anime.schedule') ? 'border-red-500/40 bg-red-500/15 text-red-200' : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200' }}">
                 Jadwal Rilis
             </a>
+            <a href="{{ route('anime.movies') }}" class="shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium leading-none transition sm:px-4 sm:text-xs {{ request()->routeIs('anime.movies*') ? 'border-red-500/40 bg-red-500/15 text-red-200' : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-200' }}">
+                Movie
+            </a>
         </div>
     </div>
     @endif

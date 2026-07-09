@@ -23,29 +23,7 @@
                 @foreach ($animeList as $anime)
                 @php $slug = $anime['animeId'] ?? $anime['slug'] ?? $anime['id'] ?? ''; @endphp
                 @if($slug)
-                <a href="{{ route('anime.detail', $slug) }}" class="group relative flex flex-col rounded-2xl bg-neutral-900 border border-white/5 overflow-hidden hover:border-green-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-green-900/20">
-                    <div class="aspect-[3/4] w-full relative overflow-hidden bg-neutral-950">
-                        <img src="{{ $anime['poster'] ?? $anime['cover'] ?? $anime['thumbnail'] ?? '' }}" alt="{{ $anime['title'] ?? '' }}" class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:opacity-80" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300&auto=format&fit=crop'">
-                        <div class="absolute inset-0 bg-gradient-to-t from-neutral-900 via-neutral-900/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity"></div>
-                        
-                        @if(!empty($anime['episodes']))
-                        <div class="absolute top-3 right-3 bg-neutral-800 text-white text-xs font-bold px-2.5 py-1 rounded-md shadow-lg backdrop-blur-md bg-opacity-90 border border-white/10">
-                            {{ $anime['episodes'] }} Eps
-                        </div>
-                        @endif
-                    </div>
-                    <div class="p-4 flex flex-col flex-1 z-10 -mt-8">
-                        <h3 class="text-sm sm:text-base font-semibold text-white line-clamp-2 group-hover:text-green-400 transition-colors drop-shadow-md">{{ $anime['title'] ?? '' }}</h3>
-                        <div class="mt-auto pt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-                            <span class="inline-flex items-center gap-1.5 rounded-md bg-green-500/10 px-2 py-1 font-medium text-green-400">
-                                <i class="ri-check-line"></i> Tamat
-                            </span>
-                            @if(!empty($anime['score']))
-                            <span class="text-yellow-400 font-medium"><i class="ri-star-fill"></i> {{ $anime['score'] }}</span>
-                            @endif
-                        </div>
-                    </div>
-                </a>
+                <x-anime.card :anime="$anime" />
                 @endif
                 @endforeach
             </div>

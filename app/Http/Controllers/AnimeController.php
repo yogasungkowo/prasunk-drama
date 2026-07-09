@@ -107,6 +107,7 @@ class AnimeController extends Controller
         return view('pages.anime.detail', [
             'anime' => $anime,
             'relatedAnime' => $relatedAnime,
+            'recommendedAnimeList' => $anime['recommendedAnimeList'] ?? [],
             'slug' => $slug,
         ]);
     }
@@ -182,6 +183,7 @@ class AnimeController extends Controller
             'episode' => $episode,
             'batchDownload' => $batchDownload,
             'relatedAnime' => $relatedAnime,
+            'recommendedAnimeList' => $animeDetail['recommendedAnimeList'] ?? [],
             'slug' => $slug,
         ]);
     }
@@ -926,6 +928,132 @@ class AnimeController extends Controller
         }
 
         return $status ? str($status)->title()->toString() : '';
+    }
+
+    // ==========================================
+    // Movie Methods (samehadaku source)
+    // ==========================================
+
+    public function movies(\Illuminate\Http\Request $request)
+    {
+        $movieList = [];
+        $page = max(1, (int) $request->input('page', 1));
+        $search = strtolower($request->input('q', ''));
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0'
+            ])->get("{$this->baseUrl}/anime/samehadaku/movies?page={$page}");
+
+            if ($response->successful()) {
+                $movieList = $response->json()['data']['animeList'] ?? [];
+            }
+        } catch (\Exception $e) {
+            // Silence
+        }
+
+        if ($search && !empty($movieList)) {
+            $movieList = array_filter($movieList, function ($movie) use ($search) {
+                return str_contains(strtolower($movie['title'] ?? ''), $search);
+            });
+            $movieList = array_values($movieList);
+        }
+
+        if ($request->ajax()) {
+            return response()->json([
+                'data' => $movieList,
+                'currentPage' => $page,
+                'searchQuery' => $request->input('q', ''),
+            ]);
+        }
+
+        return view('pages.anime.movies', [
+            'movieList' => $movieList,
+            'currentPage' => $page,
+            'searchQuery' => $request->input('q', ''),
+        ]);
+    }
+
+    public function movieDetail($slug)
+    {
+        $movie = null;
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0'
+            ])->get("{$this->baseUrl}/anime/samehadaku/anime/{$slug}");
+
+            if ($response->successful()) {
+                $movie = $response->json()['data'] ?? $response->json();
+            }
+        } catch (\Exception $e) {
+            // Silence
+        }
+
+        if (!$movie) {
+            return redirect()->route('anime.movies')->with('error', 'Movie not found');
+        }
+
+        return view('pages.anime.movie-detail', [
+            'movie' => $movie,
+            'slug' => $slug,
+        ]);
+    }
+
+    public function movieEpisode($slug)
+    {
+        $episode = null;
+        $movieDetail = null;
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0'
+            ])->get("{$this->baseUrl}/anime/samehadaku/episode/{$slug}");
+
+            if ($response->successful()) {
+                $episode = $response->json()['data'] ?? $response->json();
+            }
+
+            if ($episode && !empty($episode['animeId'])) {
+                $detailResponse = Http::withHeaders([
+                    'User-Agent' => 'Mozilla/5.0'
+                ])->get("{$this->baseUrl}/anime/samehadaku/anime/{$episode['animeId']}");
+
+                if ($detailResponse->successful()) {
+                    $movieDetail = $detailResponse->json()['data'] ?? $detailResponse->json();
+                }
+            }
+        } catch (\Exception $e) {
+            // Silence
+        }
+
+        if (!$episode) {
+            return redirect()->route('anime.movies')->with('error', 'Episode not found');
+        }
+
+        return view('pages.anime.movie-play', [
+            'episode' => $episode,
+            'movieDetail' => $movieDetail,
+            'slug' => $slug,
+        ]);
+    }
+
+    public function movieServer($serverId)
+    {
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0'
+            ])->get("{$this->baseUrl}/anime/samehadaku/server/{$serverId}");
+
+            if ($response->successful()) {
+                $data = $response->json()['data'] ?? $response->json();
+                return response()->json($data);
+            }
+        } catch (\Exception $e) {
+            // Silence
+        }
+
+        return response()->json(['error' => 'Failed to fetch server URL'], 500);
     }
 
     private function getRelatedAnimeByGenre($genres, array $exclude = [], int $limit = 10): ?array
